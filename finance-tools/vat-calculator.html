@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>增值税计算器 - 财税工具</title>
+  <link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+  <div class="container">
+    <div id="header"></div>
+
+    <div class="card">
+      <h3 class="card-title">输入信息</h3>
+      
+      <div id="taxpayer-type-input"></div>
+      <div id="amount-input"></div>
+      <div id="rate-input"></div>
+      
+      <div class="options-group">
+        <div class="option-item">
+          <input type="radio" id="include-tax" name="taxType" value="true" checked>
+          <label for="include-tax">含税金额</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" id="exclude-tax" name="taxType" value="false">
+          <label for="exclude-tax">不含税金额</label>
+        </div>
+      </div>
+
+      <div id="input-tax-group" style="display: none;">
+        <div id="input-tax-input"></div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="calculate()">计算</button>
+        <button class="btn btn-secondary" onclick="clearForm()">清空</button>
+      </div>
+    </div>
+
+    <div id="result-container" style="display: none;">
+      <div id="result-card"></div>
+      <div id="details-card"></div>
+    </div>
+  </div>
+
+  <script src="shared/components.js"></script>
+  <script src="shared/utils.js"></script>
+  <script src="shared/calculators.js"></script>
+  <script>
+    document.getElementById('header').innerHTML = createFinanceHeader(
+      '增值税计算器',
+      '计算增值税，支持一般纳税人和小规模纳税人'
+    );
+
+    document.getElementById('taxpayer-type-input').innerHTML = createInputGroup({
+      label: '纳税人类型',
+      id: 'taxpayerType',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 'general', label: '一般纳税人' },
+        { value: 'small', label: '小规模纳税人' }
+      ]
+    });
+
+    document.getElementById('amount-input').innerHTML = createInputGroup({
+      label: '金额',
+      id: 'amount',
+      type: 'number',
+      placeholder: '请输入金额',
+      required: true,
+      min: 0,
+      step: '0.01',
+      unit: '元'
+    });
+
+    document.getElementById('rate-input').innerHTML = createInputGroup({
+      label: '税率',
+      id: 'rate',
+      type: 'select',
+      required: true,
+      options: [
+        { value: '0.13', label: '13%（标准税率）' },
+        { value: '0.09', label: '9%（低税率）' },
+        { value: '0.06', label: '6%（低税率）' },
+        { value: '0.03', label: '3%（小规模）' },
+        { value: '0.01', label: '1%（小规模优惠）' }
+      ]
+    });
+
+    document.getElementById('input-tax-input').innerHTML = createInputGroup({
+      label: '进项税额',
+      id: 'inputTax',
+      type: 'number',
+      placeholder: '请输入进项税额',
+      min: 0,
+      step: '0.01',
+      unit: '元',
+      hint: '一般纳税人可抵扣进项税额'
+    });
+
+    // 监听纳税人类型变化
+    document.getElementById('taxpayerType').addEventListener('change', function() {
+      const inputTaxGroup = document.getElementById('input-tax-group');
+      inputTaxGroup.style.display = this.value === 'general' ? 'block' : 'none';
+    });
+
+    function calculate() {
+      clearAllInputErrors();
+      
+      const amount = document.getElementById('amount').value;
+      const rate = document.getElementById('rate').value;
+      const isIncludeTax = document.querySelector('input[name="taxType"]:checked').value === 'true';
+      const taxpayerType = document.getElementById('taxpayerType').value;
+      const inputTax = taxpayerType === 'general' ? (document.getElementById('inputTax').value || 0) : 0;
+
+      const amountValidation = validateNumber(amount, 0);
+      if (!amountValidation.valid) {
+        showInputError('amount', amountValidation.error);
+        return;
+      }
+
+      const result = calculateVAT(amountValidation.value, Number(rate), isIncludeTax, Number(inputTax));
+      displayResults(result);
+      
+      saveToHistory('vat-calculator', { amount: amountValidation.value, rate, isIncludeTax, inputTax, result });
+    }
+
+    function displayResults(result) {
+      const resultData = {
+        amountWithoutTax: {
+          label: '不含税金额',
+          value: formatCurrency(result.amountWithoutTax) + ' 元'
+        },
+        amountWithTax: {
+          label: '含税金额',
+          value: formatCurrency(result.amountWithTax) + ' 元'
+        },
+        outputTax: {
+          label: '销项税额',
+          value: formatCurrency(result.outputTax) + ' 元'
+        },
+        payableTax: {
+          label: '应纳税额',
+          value: formatCurrency(result.payableTax) + ' 元',
+          highlight: true
+        }
+      };
+
+      document.getElementById('result-card').innerHTML = createResultCard('计算结果', resultData);
+
+      const detailsHTML = createDetailsList(result.steps.map(step => ({
+        label: step.label,
+        value: typeof step.value === 'number' ? formatCurrency(step.value) : step.value,
+        formula: step.formula
+      })));
+
+      document.getElementById('details-card').innerHTML = createCollapsible(
+        '详细计算过程',
+        `<div class="card">${detailsHTML}</div>`,
+        false
+      );
+
+      document.getElementById('result-container').style.display = 'block';
+      showMessage('success', '计算完成');
+    }
+
+    function clearForm() {
+      document.getElementById('amount').value = '';
+      document.getElementById('inputTax').value = '';
+      document.getElementById('result-container').style.display = 'none';
+      clearAllInputErrors();
+    }
+  </script>
+</body>
+</html>

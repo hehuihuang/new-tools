@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF 水印 - PDF 工具套件</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <link rel="stylesheet" href="./shared/styles.css">
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>PDF 文字水印</h1>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card" id="upload-section">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">📄</div>
+                <h3>点击或拖拽上传 PDF 文件</h3>
+            </div>
+        </div>
+
+        <div class="card" id="watermark-section" style="display: none;">
+            <h3>水印配置</h3>
+            <div style="margin: 20px 0;">
+                <label>水印文字: <input type="text" id="watermark-text" value="机密文件" style="width: 200px; padding: 5px;"></label><br><br>
+                <label>字体大小: <input type="number" id="font-size" value="48" min="12" max="100" style="width: 80px; padding: 5px;"> px</label><br><br>
+                <label>透明度: <input type="range" id="opacity" min="0" max="100" value="30" style="width: 200px;"> <span id="opacity-value">30%</span></label><br><br>
+                <label>颜色: <input type="color" id="color" value="#000000"></label>
+            </div>
+            
+            <button class="btn btn-primary" id="apply-btn">应用水印</button>
+        </div>
+    </div>
+
+    <script>
+        class PDFWatermarkTool {
+            constructor() {
+                this.uploader = new FileUploader({ multiple: false });
+                this.progress = new ProgressIndicator();
+                this.pdfDoc = null;
+                
+                this._initElements();
+                this._bindEvents();
+            }
+
+            _initElements() {
+                this.uploadArea = document.getElementById('upload-area');
+                this.uploadSection = document.getElementById('upload-section');
+                this.watermarkSection = document.getElementById('watermark-section');
+                this.watermarkText = document.getElementById('watermark-text');
+                this.fontSize = document.getElementById('font-size');
+                this.opacity = document.getElementById('opacity');
+                this.opacityValue = document.getElementById('opacity-value');
+                this.color = document.getElementById('color');
+                this.applyBtn = document.getElementById('apply-btn');
+            }
+
+            _bindEvents() {
+                this.uploadArea.addEventListener('click', () => {
+                    this.uploader.selectFiles().then(files => {
+                        this.loadPDF(files[0]);
+                    }).catch(err => {});
+                });
+
+                this.uploader.setupDropZone(this.uploadArea, (files) => {
+                    this.loadPDF(files[0]);
+                });
+
+                this.opacity.addEventListener('input', (e) => {
+                    this.opacityValue.textContent = e.target.value + '%';
+                });
+
+                this.applyBtn.addEventListener('click', () => {
+                    this.applyWatermark();
+                });
+            }
+
+            async loadPDF(file) {
+                try {
+                    this.progress.show('加载 PDF...');
+                    
+                    const arrayBuffer = await this.uploader.readAsArrayBuffer(file);
+                    this.pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+                    
+                    this.uploadSection.style.display = 'none';
+                    this.watermarkSection.style.display = 'block';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('PDF 加载成功！');
+                    
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('PDF 加载失败: ' + error.message);
+                }
+            }
+
+            // 使用 Canvas 将文字转换为图片（支持中文）
+            createTextImage(text, fontSize, color, opacity) {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // 设置字体
+                ctx.font = `${fontSize}px "Microsoft YaHei", "SimHei", sans-serif`;
+                
+                // 测量文字尺寸
+                const metrics = ctx.measureText(text);
+                const textWidth = metrics.width;
+                const textHeight = fontSize * 1.5; // 留出上下空间
+                
+                // 设置 canvas 尺寸（使用更高分辨率以提高清晰度）
+                const scale = 2;
+                canvas.width = textWidth * scale;
+                canvas.height = textHeight * scale;
+                
+                // 重新设置字体（canvas 尺寸改变后需要重新设置）
+                ctx.scale(scale, scale);
+                ctx.font = `${fontSize}px "Microsoft YaHei", "SimHei", sans-serif`;
+                ctx.textBaseline = 'middle';
+                ctx.textAlign = 'left';
+                
+                // 设置颜色和透明度
+                const r = parseInt(color.substr(1, 2), 16);
+                const g = parseInt(color.substr(3, 2), 16);
+                const b = parseInt(color.substr(5, 2), 16);
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+                
+                // 绘制文字
+                ctx.fillText(text, 0, textHeight / 2);
+                
+                return {
+                    canvas,
+                    width: textWidth,
+                    height: textHeight
+                };
+            }
+
+            async applyWatermark() {
+                try {
+                    const text = this.watermarkText.value.trim();
+                    if (!text) {
+                        Utils.showError('请输入水印文字');
+                        return;
+                    }
+                    
+                    this.progress.show('生成水印...');
+                    
+                    const pages = this.pdfDoc.getPages();
+                    const fontSize = parseInt(this.fontSize.value);
+                    const opacity = parseInt(this.opacity.value) / 100;
+                    const colorHex = this.color.value;
+                    
+                    // 使用 Canvas 生成水印图片
+                    const { canvas, width: imgWidth, height: imgHeight } = 
+                        this.createTextImage(text, fontSize, colorHex, opacity);
+                    
+                    // 将 canvas 转换为 PNG
+                    const pngDataUrl = canvas.toDataURL('image/png');
+                    const pngData = pngDataUrl.split(',')[1];
+                    const pngBytes = Uint8Array.from(atob(pngData), c => c.charCodeAt(0));
+                    
+                    // 嵌入图片到 PDF
+                    this.progress.show('嵌入水印到 PDF...');
+                    const watermarkImage = await this.pdfDoc.embedPng(pngBytes);
+                    
+                    // 在每一页添加水印
+                    for (let i = 0; i < pages.length; i++) {
+                        this.progress.show(`应用水印 ${i + 1}/${pages.length}...`);
+                        const page = pages[i];
+                        const { width, height } = page.getSize();
+                        
+                        // 计算旋转后的位置（45度对角线水印）
+                        const centerX = width / 2;
+                        const centerY = height / 2;
+                        
+                        page.drawImage(watermarkImage, {
+                            x: centerX - imgWidth / 2,
+                            y: centerY - imgHeight / 2,
+                            width: imgWidth,
+                            height: imgHeight,
+                            rotate: PDFLib.degrees(-45),
+                            opacity: 1 // 透明度已在图片中处理
+                        });
+                    }
+                    
+                    this.progress.show('保存 PDF...');
+                    const pdfBytes = await this.pdfDoc.save();
+                    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                    
+                    Utils.downloadFile(blob, 'watermarked.pdf');
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('水印应用成功！');
+                    
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('水印应用失败: ' + error.message);
+                    console.error(error);
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new PDFWatermarkTool();
+        });
+    </script>
+</body>
+</html>

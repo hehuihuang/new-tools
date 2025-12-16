@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片拼接 - 图片工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>图片拼接</h1>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card" id="upload-section">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">🖼️</div>
+                <h3>点击或拖拽上传多张图片</h3>
+                <p style="color: #666; font-size: 14px; margin-top: 10px;">可以选择多张图片</p>
+            </div>
+        </div>
+
+        <div class="card" id="process-section" style="display: none;">
+            <h3>已上传 <span id="file-count">0</span> 张图片</h3>
+            
+            <div class="input-group">
+                <label>拼接方向</label>
+                <select id="direction-select">
+                    <option value="horizontal">水平拼接</option>
+                    <option value="vertical">垂直拼接</option>
+                </select>
+            </div>
+            
+            <div class="input-group">
+                <label>图片间距 (px)</label>
+                <input type="number" id="spacing-input" value="0" min="0" max="100">
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <button class="btn btn-primary" id="merge-btn">生成拼接图</button>
+                <button class="btn btn-secondary" id="reset-btn" style="margin-left: 10px;">重新上传</button>
+            </div>
+
+            <div id="result-section" style="display: none; margin-top: 30px;">
+                <h3>拼接结果</h3>
+                <div class="image-viewer">
+                    <canvas id="result-canvas"></canvas>
+                </div>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="btn btn-secondary" id="download-btn">下载拼接图</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ImageMergeTool {
+            constructor() {
+                this.uploader = new ImageUploader({ multiple: true });
+                this.progress = new ProgressIndicator();
+                this.images = [];
+                this.mergedBlob = null;
+                
+                this._initElements();
+                this._bindEvents();
+            }
+
+            _initElements() {
+                this.uploadArea = document.getElementById('upload-area');
+                this.uploadSection = document.getElementById('upload-section');
+                this.processSection = document.getElementById('process-section');
+                this.fileCount = document.getElementById('file-count');
+                this.directionSelect = document.getElementById('direction-select');
+                this.spacingInput = document.getElementById('spacing-input');
+                this.resultSection = document.getElementById('result-section');
+                this.resultCanvas = document.getElementById('result-canvas');
+            }
+
+            _bindEvents() {
+                this.uploadArea.addEventListener('click', () => {
+                    this.uploader.selectFiles().then(files => this.loadImages(files)).catch(err => {});
+                });
+
+                this.uploader.setupDropZone(this.uploadArea, (files) => this.loadImages(files));
+
+                document.getElementById('merge-btn').addEventListener('click', () => this.mergeImages());
+                document.getElementById('download-btn').addEventListener('click', () => this.downloadImage());
+                document.getElementById('reset-btn').addEventListener('click', () => this.reset());
+            }
+
+            async loadImages(files) {
+                try {
+                    this.progress.show('加载图片...');
+                    
+                    this.images = [];
+                    
+                    for (const file of files) {
+                        const dataURL = await this.uploader.readAsDataURL(file);
+                        const canvas = document.createElement('canvas');
+                        await Utils.loadImageToCanvas(dataURL, canvas);
+                        this.images.push({ file, canvas });
+                    }
+                    
+                    this.fileCount.textContent = this.images.length;
+                    
+                    this.uploadSection.style.display = 'none';
+                    this.processSection.style.display = 'block';
+                    this.resultSection.style.display = 'none';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess(`已加载 ${this.images.length} 张图片！`);
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('图片加载失败: ' + error.message);
+                }
+            }
+
+            async mergeImages() {
+                try {
+                    this.progress.show('拼接图片...');
+                    
+                    const direction = this.directionSelect.value;
+                    const spacing = parseInt(this.spacingInput.value);
+                    
+                    let totalWidth = 0;
+                    let totalHeight = 0;
+                    let maxWidth = 0;
+                    let maxHeight = 0;
+                    
+                    // 计算总尺寸
+                    this.images.forEach(img => {
+                        if (direction === 'horizontal') {
+                            totalWidth += img.canvas.width;
+                            maxHeight = Math.max(maxHeight, img.canvas.height);
+                        } else {
+                            totalHeight += img.canvas.height;
+                            maxWidth = Math.max(maxWidth, img.canvas.width);
+                        }
+                    });
+                    
+                    // 添加间距
+                    if (direction === 'horizontal') {
+                        totalWidth += spacing * (this.images.length - 1);
+                        totalHeight = maxHeight;
+                    } else {
+                        totalHeight += spacing * (this.images.length - 1);
+                        totalWidth = maxWidth;
+                    }
+                    
+                    // 创建结果 canvas
+                    this.resultCanvas.width = totalWidth;
+                    this.resultCanvas.height = totalHeight;
+                    const ctx = this.resultCanvas.getContext('2d');
+                    
+                    // 绘制图片
+                    let currentX = 0;
+                    let currentY = 0;
+                    
+                    this.images.forEach(img => {
+                        ctx.drawImage(img.canvas, currentX, currentY);
+                        
+                        if (direction === 'horizontal') {
+                            currentX += img.canvas.width + spacing;
+                        } else {
+                            currentY += img.canvas.height + spacing;
+                        }
+                    });
+                    
+                    this.mergedBlob = await Utils.canvasToBlob(this.resultCanvas, 'image/png');
+                    this.resultSection.style.display = 'block';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('图片拼接完成！');
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('图片拼接失败: ' + error.message);
+                }
+            }
+
+            downloadImage() {
+                if (this.mergedBlob) {
+                    Utils.downloadFile(this.mergedBlob, 'merged-image.png');
+                    Utils.showSuccess('下载成功！');
+                }
+            }
+
+            reset() {
+                this.uploadSection.style.display = 'block';
+                this.processSection.style.display = 'none';
+                this.resultSection.style.display = 'none';
+                this.images = [];
+                this.mergedBlob = null;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new ImageMergeTool();
+        });
+    </script>
+</body>
+</html>

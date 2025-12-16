@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF 压缩 - PDF 工具套件</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <link rel="stylesheet" href="./shared/styles.css">
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>PDF 压缩</h1>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card" id="upload-section">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">📄</div>
+                <h3>点击或拖拽上传 PDF 文件</h3>
+            </div>
+        </div>
+
+        <div class="card" id="compress-section" style="display: none;">
+            <h3>文件信息</h3>
+            <p id="file-info"></p>
+            
+            <h3 style="margin-top: 20px;">压缩质量</h3>
+            <div style="margin: 20px 0;">
+                <label>
+                    <input type="radio" name="quality" value="0.3"> 低质量（高压缩）
+                </label><br>
+                <label>
+                    <input type="radio" name="quality" value="0.7" checked> 中等质量（推荐）
+                </label><br>
+                <label>
+                    <input type="radio" name="quality" value="0.9"> 高质量（低压缩）
+                </label>
+            </div>
+            
+            <button class="btn btn-primary" id="compress-btn">压缩 PDF</button>
+            
+            <div id="result-section" style="display: none; margin-top: 20px; padding: 15px; background: #e8f5e9; border-radius: 4px;">
+                <h3>压缩结果</h3>
+                <p id="result-info"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class PDFCompressTool {
+            constructor() {
+                this.uploader = new FileUploader({ multiple: false });
+                this.progress = new ProgressIndicator();
+                this.pdfDoc = null;
+                this.originalSize = 0;
+                this.file = null;
+                
+                this._initElements();
+                this._bindEvents();
+            }
+
+            _initElements() {
+                this.uploadArea = document.getElementById('upload-area');
+                this.uploadSection = document.getElementById('upload-section');
+                this.compressSection = document.getElementById('compress-section');
+                this.fileInfo = document.getElementById('file-info');
+                this.resultSection = document.getElementById('result-section');
+                this.resultInfo = document.getElementById('result-info');
+            }
+
+            _bindEvents() {
+                this.uploadArea.addEventListener('click', () => {
+                    this.uploader.selectFiles().then(files => {
+                        this.loadPDF(files[0]);
+                    }).catch(err => {});
+                });
+
+                this.uploader.setupDropZone(this.uploadArea, (files) => {
+                    this.loadPDF(files[0]);
+                });
+
+                document.getElementById('compress-btn').addEventListener('click', () => {
+                    this.compressPDF();
+                });
+            }
+
+            async loadPDF(file) {
+                try {
+                    this.progress.show('加载 PDF...');
+                    
+                    this.file = file;
+                    this.originalSize = file.size;
+                    
+                    const arrayBuffer = await this.uploader.readAsArrayBuffer(file);
+                    this.pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+                    
+                    this.fileInfo.textContent = `文件名: ${file.name} | 大小: ${Utils.formatFileSize(file.size)} | 页数: ${this.pdfDoc.getPageCount()}`;
+                    
+                    this.uploadSection.style.display = 'none';
+                    this.compressSection.style.display = 'block';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('PDF 加载成功！');
+                    
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('PDF 加载失败: ' + error.message);
+                }
+            }
+
+            async compressPDF() {
+                try {
+                    this.progress.show('压缩 PDF...');
+                    
+                    const quality = parseFloat(document.querySelector('input[name="quality"]:checked').value);
+                    
+                    // 使用 Canvas 重绘方式进行真实压缩
+                    const arrayBuffer = await this.uploader.readAsArrayBuffer(this.file);
+                    
+                    // 使用 PDF.js 渲染页面
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    
+                    // 创建新的 PDF 文档
+                    const newPdfDoc = await PDFLib.PDFDocument.create();
+                    
+                    const numPages = pdf.numPages;
+                    
+                    for (let i = 1; i <= numPages; i++) {
+                        this.progress.update((i / numPages) * 100, `压缩第 ${i}/${numPages} 页...`);
+                        
+                        const page = await pdf.getPage(i);
+                        const viewport = page.getViewport({ scale: 1.5 });
+                        
+                        // 创建 canvas 并渲染
+                        const canvas = document.createElement('canvas');
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+                        
+                        await page.render({
+                            canvasContext: canvas.getContext('2d'),
+                            viewport: viewport
+                        }).promise;
+                        
+                        // 将 canvas 转换为图片，应用压缩质量
+                        const imageBlob = await new Promise(resolve => {
+                            canvas.toBlob(resolve, 'image/jpeg', quality);
+                        });
+                        
+                        // 将压缩后的图片嵌入新 PDF
+                        const imageBytes = await imageBlob.arrayBuffer();
+                        const image = await newPdfDoc.embedJpg(imageBytes);
+                        
+                        // 添加页面
+                        const newPage = newPdfDoc.addPage([viewport.width, viewport.height]);
+                        newPage.drawImage(image, {
+                            x: 0,
+                            y: 0,
+                            width: viewport.width,
+                            height: viewport.height
+                        });
+                    }
+                    
+                    // 保存压缩后的 PDF
+                    const pdfBytes = await newPdfDoc.save({
+                        useObjectStreams: true,
+                        addDefaultPage: false
+                    });
+                    
+                    const compressedSize = pdfBytes.length;
+                    const ratio = ((this.originalSize - compressedSize) / this.originalSize * 100).toFixed(1);
+                    
+                    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                    Utils.downloadFile(blob, 'compressed.pdf');
+                    
+                    this.resultInfo.textContent = `原始大小: ${Utils.formatFileSize(this.originalSize)} | 压缩后: ${Utils.formatFileSize(compressedSize)} | 压缩率: ${ratio}%`;
+                    this.resultSection.style.display = 'block';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('PDF 压缩完成！');
+                    
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('PDF 压缩失败: ' + error.message);
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new PDFCompressTool();
+        });
+    </script>
+</body>
+</html>

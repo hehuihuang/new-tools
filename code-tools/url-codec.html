@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL 编码/解码 - 代码工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>URL 编码 / 解码</h1>
+            <p>编码特殊字符，或将已编码的 URL 恢复为可读格式</p>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card">
+            <div class="editor-container">
+                <label class="editor-label">输入文本</label>
+                <textarea id="input-editor" class="editor" placeholder="在此输入要编码或解码的文本..."></textarea>
+            </div>
+
+            <div style="margin: 15px 0;">
+                <label class="editor-label">编码模式</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="mode" value="component" checked>
+                        组件编码 (encodeURIComponent) - 编码所有特殊字符
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="mode" value="full">
+                        完整URL编码 (encodeURI) - 保留URL结构字符
+                    </label>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" id="encode-btn">编码</button>
+                <button class="btn btn-primary" id="decode-btn">解码</button>
+                <button class="btn btn-danger" id="clear-btn">清空</button>
+            </div>
+        </div>
+
+        <div class="card" id="output-section" style="display: none;">
+            <div class="editor-container">
+                <label class="editor-label">输出结果</label>
+                <textarea id="output-editor" class="editor" readonly></textarea>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-secondary" id="copy-btn">复制到剪贴板</button>
+                <button class="btn btn-secondary" id="swap-btn">交换输入输出</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+    <script>
+        class URLCodecTool {
+            constructor() {
+                this.inputEditor = document.getElementById('input-editor');
+                this.outputEditor = document.getElementById('output-editor');
+                this.outputSection = document.getElementById('output-section');
+                this.fileHandler = new FileHandler();
+                
+                this._bindEvents();
+            }
+
+            _bindEvents() {
+                document.getElementById('encode-btn').addEventListener('click', () => this.encode());
+                document.getElementById('decode-btn').addEventListener('click', () => this.decode());
+                document.getElementById('clear-btn').addEventListener('click', () => this.clear());
+                document.getElementById('copy-btn').addEventListener('click', () => this.copy());
+                document.getElementById('swap-btn').addEventListener('click', () => this.swap());
+            }
+
+            getMode() {
+                return document.querySelector('input[name="mode"]:checked').value;
+            }
+
+            encode() {
+                const input = this.inputEditor.value;
+                if (!input) {
+                    CodeUtils.showWarning('请输入要编码的文本');
+                    return;
+                }
+
+                try {
+                    const mode = this.getMode();
+                    const encoded = CodeUtils.encodeURL(input, mode);
+                    this.outputEditor.value = encoded;
+                    this.outputSection.style.display = 'block';
+                    this.inputEditor.classList.remove('error');
+                    CodeUtils.showSuccess('URL 编码成功');
+                } catch (error) {
+                    this.inputEditor.classList.add('error');
+                    CodeUtils.showError('编码失败: ' + error.message);
+                }
+            }
+
+            decode() {
+                const input = this.inputEditor.value;
+                if (!input) {
+                    CodeUtils.showWarning('请输入要解码的文本');
+                    return;
+                }
+
+                try {
+                    const decoded = CodeUtils.decodeURL(input);
+                    this.outputEditor.value = decoded;
+                    this.outputSection.style.display = 'block';
+                    this.inputEditor.classList.remove('error');
+                    CodeUtils.showSuccess('URL 解码成功');
+                } catch (error) {
+                    this.inputEditor.classList.add('error');
+                    CodeUtils.showError('解码失败: ' + error.message);
+                }
+            }
+
+            clear() {
+                this.inputEditor.value = '';
+                this.outputEditor.value = '';
+                this.outputSection.style.display = 'none';
+                this.inputEditor.classList.remove('error');
+            }
+
+            async copy() {
+                const output = this.outputEditor.value;
+                if (!output) {
+                    CodeUtils.showWarning('没有可复制的内容');
+                    return;
+                }
+                await this.fileHandler.copyToClipboard(output);
+            }
+
+            swap() {
+                const output = this.outputEditor.value;
+                if (!output) {
+                    CodeUtils.showWarning('没有可交换的内容');
+                    return;
+                }
+                this.inputEditor.value = output;
+                this.outputEditor.value = '';
+                this.outputSection.style.display = 'none';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new URLCodecTool();
+        });
+    </script>
+</body>
+</html>

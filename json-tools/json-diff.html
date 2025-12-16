@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON 差异比较 - JSON 工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>JSON 差异比较</h1>
+            <p>比较两个 JSON 数据的差异，高亮显示新增、删除和修改的内容</p>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="split-view">
+            <div class="card">
+                <div class="editor-container">
+                    <label class="editor-label">JSON 1（原始）</label>
+                    <textarea id="json1-input" class="editor" placeholder="在此输入第一个 JSON 数据..."></textarea>
+                </div>
+                <button class="btn btn-secondary" id="upload-json1-btn" style="margin-top: 10px;">上传文件</button>
+            </div>
+
+            <div class="card">
+                <div class="editor-container">
+                    <label class="editor-label">JSON 2（对比）</label>
+                    <textarea id="json2-input" class="editor" placeholder="在此输入第二个 JSON 数据..."></textarea>
+                </div>
+                <button class="btn btn-secondary" id="upload-json2-btn" style="margin-top: 10px;">上传文件</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="btn-group">
+                <button class="btn btn-primary" id="compare-btn">比较差异</button>
+                <button class="btn btn-danger" id="clear-btn">清空</button>
+            </div>
+        </div>
+
+        <div class="card" id="result-section" style="display: none;">
+            <h3>差异结果</h3>
+            <div id="diff-result"></div>
+        </div>
+    </div>
+
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+    <script>
+        class JSONDiffTool {
+            constructor() {
+                this.json1Input = document.getElementById('json1-input');
+                this.json2Input = document.getElementById('json2-input');
+                this.resultSection = document.getElementById('result-section');
+                this.diffResult = document.getElementById('diff-result');
+                this.fileHandler = new FileHandler();
+                this.diffViewer = new DiffViewer(this.diffResult);
+                
+                this._bindEvents();
+            }
+
+            _bindEvents() {
+                // 比较按钮
+                document.getElementById('compare-btn').addEventListener('click', () => {
+                    this.compareJSON();
+                });
+
+                // 清空按钮
+                document.getElementById('clear-btn').addEventListener('click', () => {
+                    this.clear();
+                });
+
+                // 上传按钮
+                document.getElementById('upload-json1-btn').addEventListener('click', async () => {
+                    await this.uploadFile(this.json1Input);
+                });
+
+                document.getElementById('upload-json2-btn').addEventListener('click', async () => {
+                    await this.uploadFile(this.json2Input);
+                });
+            }
+
+            compareJSON() {
+                const json1 = this.json1Input.value.trim();
+                const json2 = this.json2Input.value.trim();
+                
+                if (!json1 || !json2) {
+                    Utils.showError('请输入两个 JSON 数据');
+                    return;
+                }
+
+                try {
+                    Utils.showLoading('比较中...');
+                    
+                    // 验证两个 JSON
+                    const result1 = Utils.validateJSON(json1);
+                    const result2 = Utils.validateJSON(json2);
+                    
+                    if (!result1.valid) {
+                        this.json1Input.classList.add('error');
+                        throw new Error('JSON 1 格式错误: ' + result1.error.message);
+                    }
+                    
+                    if (!result2.valid) {
+                        this.json2Input.classList.add('error');
+                        throw new Error('JSON 2 格式错误: ' + result2.error.message);
+                    }
+
+                    // 比较差异
+                    const diff = this.diffViewer.compare(json1, json2);
+                    this.diffViewer.render(diff);
+                    
+                    this.resultSection.style.display = 'block';
+                    this.json1Input.classList.remove('error');
+                    this.json2Input.classList.remove('error');
+                    
+                    Utils.hideLoading();
+                    Utils.showSuccess('比较完成');
+                } catch (error) {
+                    Utils.hideLoading();
+                    Utils.showError(error.message);
+                    this.resultSection.style.display = 'none';
+                }
+            }
+
+            async uploadFile(editor) {
+                try {
+                    const file = await this.fileHandler.uploadFile(['.json', '.txt']);
+                    const content = await this.fileHandler.readAsText(file);
+                    editor.value = content;
+                    Utils.showSuccess('文件上传成功');
+                } catch (error) {
+                    if (error.message !== '未选择文件') {
+                        Utils.showError('文件上传失败: ' + error.message);
+                    }
+                }
+            }
+
+            clear() {
+                this.json1Input.value = '';
+                this.json2Input.value = '';
+                this.resultSection.style.display = 'none';
+                this.json1Input.classList.remove('error');
+                this.json2Input.classList.remove('error');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new JSONDiffTool();
+        });
+    </script>
+</body>
+</html>

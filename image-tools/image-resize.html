@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>尺寸调整 - 图片工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>图片尺寸调整</h1>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card" id="upload-section">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">🖼️</div>
+                <h3>点击或拖拽上传图片</h3>
+            </div>
+        </div>
+
+        <div class="card" id="process-section" style="display: none;">
+            <h3>原始尺寸: <span id="original-size"></span></h3>
+            
+            <div class="input-group">
+                <label>
+                    <input type="checkbox" id="maintain-ratio" checked> 保持宽高比
+                </label>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="input-group">
+                    <label>宽度 (px)</label>
+                    <input type="number" id="width-input" min="1">
+                </div>
+                <div class="input-group">
+                    <label>高度 (px)</label>
+                    <input type="number" id="height-input" min="1">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>或按百分比缩放</label>
+                <input type="number" id="scale-input" min="1" max="500" placeholder="例如: 50 表示缩小到50%">
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button class="btn btn-primary" id="resize-btn">调整尺寸</button>
+                <button class="btn btn-secondary" id="reset-btn" style="margin-left: 10px;">重新上传</button>
+            </div>
+
+            <div id="result-section" style="display: none; margin-top: 30px;">
+                <h3>调整结果</h3>
+                <div class="image-viewer">
+                    <canvas id="result-canvas"></canvas>
+                </div>
+                <div class="info" id="result-info" style="text-align: center; margin-top: 15px;"></div>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="btn btn-secondary" id="download-btn">下载图片</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ImageResizeTool {
+            constructor() {
+                this.uploader = new ImageUploader({ multiple: false });
+                this.progress = new ProgressIndicator();
+                this.originalCanvas = null;
+                this.originalWidth = 0;
+                this.originalHeight = 0;
+                this.resizedBlob = null;
+                
+                this._initElements();
+                this._bindEvents();
+            }
+
+            _initElements() {
+                this.uploadArea = document.getElementById('upload-area');
+                this.uploadSection = document.getElementById('upload-section');
+                this.processSection = document.getElementById('process-section');
+                this.originalSizeEl = document.getElementById('original-size');
+                this.maintainRatio = document.getElementById('maintain-ratio');
+                this.widthInput = document.getElementById('width-input');
+                this.heightInput = document.getElementById('height-input');
+                this.scaleInput = document.getElementById('scale-input');
+                this.resultSection = document.getElementById('result-section');
+                this.resultCanvas = document.getElementById('result-canvas');
+            }
+
+            _bindEvents() {
+                this.uploadArea.addEventListener('click', () => {
+                    this.uploader.selectFiles().then(files => this.loadImage(files[0])).catch(err => {});
+                });
+
+                this.uploader.setupDropZone(this.uploadArea, (files) => this.loadImage(files[0]));
+
+                // 宽度输入
+                this.widthInput.addEventListener('input', () => {
+                    if (this.maintainRatio.checked && this.widthInput.value) {
+                        const width = parseInt(this.widthInput.value);
+                        const height = Math.round(width / (this.originalWidth / this.originalHeight));
+                        this.heightInput.value = height;
+                    }
+                    this.scaleInput.value = '';
+                });
+
+                // 高度输入
+                this.heightInput.addEventListener('input', () => {
+                    if (this.maintainRatio.checked && this.heightInput.value) {
+                        const height = parseInt(this.heightInput.value);
+                        const width = Math.round(height * (this.originalWidth / this.originalHeight));
+                        this.widthInput.value = width;
+                    }
+                    this.scaleInput.value = '';
+                });
+
+                // 百分比输入
+                this.scaleInput.addEventListener('input', () => {
+                    if (this.scaleInput.value) {
+                        const scale = parseInt(this.scaleInput.value) / 100;
+                        this.widthInput.value = Math.round(this.originalWidth * scale);
+                        this.heightInput.value = Math.round(this.originalHeight * scale);
+                    }
+                });
+
+                document.getElementById('resize-btn').addEventListener('click', () => this.resizeImage());
+                document.getElementById('reset-btn').addEventListener('click', () => this.reset());
+                document.getElementById('download-btn').addEventListener('click', () => this.downloadImage());
+            }
+
+            async loadImage(file) {
+                try {
+                    this.progress.show('加载图片...');
+                    
+                    const dataURL = await this.uploader.readAsDataURL(file);
+                    const tempCanvas = document.createElement('canvas');
+                    const img = await Utils.loadImageToCanvas(dataURL, tempCanvas);
+                    
+                    this.originalCanvas = tempCanvas;
+                    this.originalWidth = img.width;
+                    this.originalHeight = img.height;
+                    this.originalFile = file;
+                    
+                    this.originalSizeEl.textContent = `${img.width} × ${img.height}`;
+                    this.widthInput.value = img.width;
+                    this.heightInput.value = img.height;
+                    
+                    this.uploadSection.style.display = 'none';
+                    this.processSection.style.display = 'block';
+                    this.resultSection.style.display = 'none';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('图片加载成功！');
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('图片加载失败: ' + error.message);
+                }
+            }
+
+            async resizeImage() {
+                try {
+                    this.progress.show('调整尺寸...');
+                    
+                    const width = parseInt(this.widthInput.value);
+                    const height = parseInt(this.heightInput.value);
+                    
+                    if (!width || !height || width <= 0 || height <= 0) {
+                        throw new Error('请输入有效的尺寸');
+                    }
+                    
+                    const resizedCanvas = Utils.resizeCanvas(this.originalCanvas, width, height);
+                    
+                    this.resultCanvas.width = width;
+                    this.resultCanvas.height = height;
+                    const ctx = this.resultCanvas.getContext('2d');
+                    ctx.drawImage(resizedCanvas, 0, 0);
+                    
+                    this.resizedBlob = await Utils.canvasToBlob(resizedCanvas, 'image/png');
+                    
+                    document.getElementById('result-info').textContent = 
+                        `新尺寸: ${width} × ${height} | 大小: ${Utils.formatFileSize(this.resizedBlob.size)}`;
+                    
+                    this.resultSection.style.display = 'block';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('尺寸调整完成！');
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('尺寸调整失败: ' + error.message);
+                }
+            }
+
+            downloadImage() {
+                if (this.resizedBlob) {
+                    const fileName = this.originalFile.name.replace(/\.[^/.]+$/, '') + '-resized.png';
+                    Utils.downloadFile(this.resizedBlob, fileName);
+                    Utils.showSuccess('下载成功！');
+                }
+            }
+
+            reset() {
+                this.uploadSection.style.display = 'block';
+                this.processSection.style.display = 'none';
+                this.resultSection.style.display = 'none';
+                this.originalCanvas = null;
+                this.resizedBlob = null;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new ImageResizeTool();
+        });
+    </script>
+</body>
+</html>

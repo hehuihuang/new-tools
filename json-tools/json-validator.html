@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON 验证 - JSON 工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>JSON 验证</h1>
+            <p>检查 JSON 语法正确性，提供详细的错误信息和统计数据</p>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card">
+            <div class="editor-container">
+                <label class="editor-label">输入 JSON 数据</label>
+                <textarea id="input-editor" class="editor" placeholder="在此输入或粘贴 JSON 数据..."></textarea>
+            </div>
+
+            <div class="input-group">
+                <label>
+                    <input type="checkbox" id="realtime-check">
+                    启用实时验证
+                </label>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" id="validate-btn">验证 JSON</button>
+                <button class="btn btn-secondary" id="upload-btn">上传文件</button>
+                <button class="btn btn-danger" id="clear-btn">清空</button>
+            </div>
+        </div>
+
+        <div class="card" id="result-section" style="display: none;">
+            <h3 id="result-title">验证结果</h3>
+            <div id="result-content"></div>
+        </div>
+    </div>
+
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+    <script>
+        class JSONValidatorTool {
+            constructor() {
+                this.inputEditor = document.getElementById('input-editor');
+                this.resultSection = document.getElementById('result-section');
+                this.resultTitle = document.getElementById('result-title');
+                this.resultContent = document.getElementById('result-content');
+                this.realtimeCheck = document.getElementById('realtime-check');
+                this.fileHandler = new FileHandler();
+                this.validationTimeout = null;
+                
+                this._bindEvents();
+            }
+
+            _bindEvents() {
+                // 验证按钮
+                document.getElementById('validate-btn').addEventListener('click', () => {
+                    this.validateJSON();
+                });
+
+                // 上传按钮
+                document.getElementById('upload-btn').addEventListener('click', async () => {
+                    try {
+                        const file = await this.fileHandler.uploadFile(['.json', '.txt']);
+                        const content = await this.fileHandler.readAsText(file);
+                        this.inputEditor.value = content;
+                        Utils.showSuccess('文件上传成功');
+                        if (this.realtimeCheck.checked) {
+                            this.validateJSON();
+                        }
+                    } catch (error) {
+                        if (error.message !== '未选择文件') {
+                            Utils.showError('文件上传失败: ' + error.message);
+                        }
+                    }
+                });
+
+                // 清空按钮
+                document.getElementById('clear-btn').addEventListener('click', () => {
+                    this.clear();
+                });
+
+                // 实时验证
+                this.inputEditor.addEventListener('input', () => {
+                    if (this.realtimeCheck.checked) {
+                        clearTimeout(this.validationTimeout);
+                        this.validationTimeout = setTimeout(() => {
+                            this.validateJSON(true);
+                        }, 500);
+                    }
+                });
+            }
+
+            validateJSON(silent = false) {
+                const input = this.inputEditor.value.trim();
+                
+                if (!input) {
+                    if (!silent) {
+                        Utils.showError('请输入 JSON 数据');
+                    }
+                    return;
+                }
+
+                const result = Utils.validateJSON(input);
+                
+                if (result.valid) {
+                    this.showSuccess(result.stats);
+                    this.inputEditor.classList.remove('error');
+                } else {
+                    this.showError(result.error);
+                    this.inputEditor.classList.add('error');
+                }
+            }
+
+            showSuccess(stats) {
+                this.resultTitle.textContent = '✓ 验证成功';
+                this.resultTitle.style.color = '#4CAF50';
+                
+                const html = `
+                    <div class="stats">
+                        <div class="stat-item">
+                            <div class="stat-label">键数量</div>
+                            <div class="stat-value">${stats.keys}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">嵌套层级</div>
+                            <div class="stat-value">${stats.depth}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">字符数</div>
+                            <div class="stat-value">${stats.size}</div>
+                        </div>
+                    </div>
+                `;
+                
+                this.resultContent.innerHTML = html;
+                this.resultSection.style.display = 'block';
+            }
+
+            showError(error) {
+                this.resultTitle.textContent = '✗ 验证失败';
+                this.resultTitle.style.color = '#F44336';
+                
+                const html = `
+                    <div style="background-color: #FFEBEE; padding: 15px; border-radius: 4px; border-left: 4px solid #F44336;">
+                        <p style="margin: 0 0 10px 0; font-weight: 500;">错误信息：</p>
+                        <p style="margin: 0 0 10px 0;">${error.message}</p>
+                        <p style="margin: 0; color: #757575;">位置：第 ${error.line} 行，第 ${error.column} 列</p>
+                    </div>
+                `;
+                
+                this.resultContent.innerHTML = html;
+                this.resultSection.style.display = 'block';
+            }
+
+            clear() {
+                this.inputEditor.value = '';
+                this.resultSection.style.display = 'none';
+                this.inputEditor.classList.remove('error');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new JSONValidatorTool();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片 Base64 转换 - 代码工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>图片 Base64 转换</h1>
+            <p>将图片转成 Base64 或 Base64 恢复为图片文件，常用于嵌入 CSS / HTML</p>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <!-- 标签页 -->
+        <div class="card">
+            <div class="tabs">
+                <button class="tab active" data-tab="img2base64">图片 → Base64</button>
+                <button class="tab" data-tab="base642img">Base64 → 图片</button>
+            </div>
+
+            <!-- 图片转 Base64 -->
+            <div id="img2base64" class="tab-content active">
+                <div id="upload-area" class="upload-area">
+                    <div class="upload-icon">🖼️</div>
+                    <div class="upload-text">点击或拖拽图片到此处</div>
+                    <div class="upload-hint">支持 PNG, JPG, GIF, WebP, SVG 格式</div>
+                </div>
+
+                <div id="image-info" style="display: none; margin-top: 15px;">
+                    <div class="stats">
+                        <div class="stat-item">
+                            <div class="stat-value" id="file-name">-</div>
+                            <div class="stat-label">文件名</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="file-size">-</div>
+                            <div class="stat-label">原始大小</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="base64-size">-</div>
+                            <div class="stat-label">Base64 长度</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="base64-output-section" style="display: none; margin-top: 15px;">
+                    <div class="editor-container">
+                        <label class="editor-label">Base64 Data URL</label>
+                        <textarea id="base64-output" class="editor" readonly></textarea>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" id="copy-base64-btn">复制 Base64</button>
+                        <button class="btn btn-secondary" id="copy-dataurl-btn">复制 Data URL</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Base64 转图片 -->
+            <div id="base642img" class="tab-content">
+                <div class="editor-container">
+                    <label class="editor-label">输入 Base64 字符串</label>
+                    <textarea id="base64-input" class="editor" placeholder="粘贴 Base64 字符串或 Data URL...&#10;例如: data:image/png;base64,iVBORw0KGgo..."></textarea>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="convert-btn">转换为图片</button>
+                    <button class="btn btn-danger" id="clear-base64-btn">清空</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 图片预览 -->
+        <div class="card" id="preview-section" style="display: none;">
+            <h3 class="card-title">图片预览</h3>
+            <div style="text-align: center;">
+                <img id="preview-image" class="image-preview" alt="预览图片">
+            </div>
+            <div class="btn-group" style="justify-content: center; margin-top: 15px;">
+                <button class="btn btn-primary" id="download-btn">下载图片</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+    <script>
+        class Base64ImageTool {
+            constructor() {
+                this.currentBase64 = '';
+                this.currentFileName = 'image';
+                this.fileHandler = new FileHandler();
+                
+                this._bindEvents();
+            }
+
+            _bindEvents() {
+                // 标签页切换
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                        e.target.classList.add('active');
+                        document.getElementById(e.target.dataset.tab).classList.add('active');
+                    });
+                });
+
+                // 上传区域
+                const uploadArea = document.getElementById('upload-area');
+                
+                uploadArea.addEventListener('click', () => this.selectImage());
+                
+                uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.add('dragover');
+                });
+                
+                uploadArea.addEventListener('dragleave', () => {
+                    uploadArea.classList.remove('dragover');
+                });
+                
+                uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.remove('dragover');
+                    const file = e.dataTransfer.files[0];
+                    if (file && file.type.startsWith('image/')) {
+                        this.processImage(file);
+                    } else {
+                        CodeUtils.showError('请上传图片文件');
+                    }
+                });
+
+                // 按钮事件
+                document.getElementById('copy-base64-btn').addEventListener('click', () => this.copyBase64());
+                document.getElementById('copy-dataurl-btn').addEventListener('click', () => this.copyDataURL());
+                document.getElementById('convert-btn').addEventListener('click', () => this.convertToImage());
+                document.getElementById('clear-base64-btn').addEventListener('click', () => this.clearBase64Input());
+                document.getElementById('download-btn').addEventListener('click', () => this.downloadImage());
+            }
+
+            async selectImage() {
+                try {
+                    const file = await this.fileHandler.uploadFile(['image/*']);
+                    this.processImage(file);
+                } catch (error) {
+                    if (error.message !== '未选择文件') {
+                        CodeUtils.showError(error.message);
+                    }
+                }
+            }
+
+            async processImage(file) {
+                try {
+                    const base64 = await CodeUtils.imageToBase64(file);
+                    this.currentBase64 = base64;
+                    this.currentFileName = file.name.replace(/\.[^/.]+$/, '');
+
+                    // 显示信息
+                    document.getElementById('file-name').textContent = file.name;
+                    document.getElementById('file-size').textContent = CodeUtils.formatFileSize(file.size);
+                    document.getElementById('base64-size').textContent = base64.length.toLocaleString() + ' 字符';
+                    document.getElementById('image-info').style.display = 'block';
+
+                    // 显示 Base64
+                    document.getElementById('base64-output').value = base64;
+                    document.getElementById('base64-output-section').style.display = 'block';
+
+                    // 显示预览
+                    document.getElementById('preview-image').src = base64;
+                    document.getElementById('preview-section').style.display = 'block';
+
+                    CodeUtils.showSuccess('图片转换成功');
+                } catch (error) {
+                    CodeUtils.showError('图片处理失败: ' + error.message);
+                }
+            }
+
+            async copyBase64() {
+                if (!this.currentBase64) {
+                    CodeUtils.showWarning('没有可复制的内容');
+                    return;
+                }
+                // 只复制 Base64 部分，不包含 data:image/xxx;base64, 前缀
+                const base64Only = this.currentBase64.split(',')[1] || this.currentBase64;
+                await this.fileHandler.copyToClipboard(base64Only);
+            }
+
+            async copyDataURL() {
+                if (!this.currentBase64) {
+                    CodeUtils.showWarning('没有可复制的内容');
+                    return;
+                }
+                await this.fileHandler.copyToClipboard(this.currentBase64);
+            }
+
+            convertToImage() {
+                let input = document.getElementById('base64-input').value.trim();
+                if (!input) {
+                    CodeUtils.showWarning('请输入 Base64 字符串');
+                    return;
+                }
+
+                // 如果没有 data URL 前缀，尝试添加
+                if (!input.startsWith('data:')) {
+                    input = 'data:image/png;base64,' + input;
+                }
+
+                // 验证格式
+                if (!CodeUtils.isValidBase64Image(input)) {
+                    CodeUtils.showError('无效的 Base64 图片格式');
+                    return;
+                }
+
+                try {
+                    this.currentBase64 = input;
+                    document.getElementById('preview-image').src = input;
+                    document.getElementById('preview-section').style.display = 'block';
+                    CodeUtils.showSuccess('转换成功');
+                } catch (error) {
+                    CodeUtils.showError('转换失败: ' + error.message);
+                }
+            }
+
+            clearBase64Input() {
+                document.getElementById('base64-input').value = '';
+                document.getElementById('preview-section').style.display = 'none';
+            }
+
+            downloadImage() {
+                if (!this.currentBase64) {
+                    CodeUtils.showWarning('没有可下载的图片');
+                    return;
+                }
+
+                try {
+                    const blob = CodeUtils.base64ToBlob(this.currentBase64);
+                    const ext = this.currentBase64.match(/data:image\/(\w+)/)?.[1] || 'png';
+                    const filename = `${this.currentFileName}.${ext}`;
+                    CodeUtils.downloadBlob(blob, filename);
+                    CodeUtils.showSuccess('图片下载成功');
+                } catch (error) {
+                    CodeUtils.showError('下载失败: ' + error.message);
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new Base64ImageTool();
+        });
+    </script>
+</body>
+</html>

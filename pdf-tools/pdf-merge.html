@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF 合并 - PDF 工具套件</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <link rel="stylesheet" href="./shared/styles.css">
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+    
+    <style>
+        .file-list { list-style: none; margin-top: 20px; }
+        .file-item { display: flex; align-items: center; padding: 15px; background: #f9f9f9; border-radius: 4px; margin-bottom: 10px; cursor: move; }
+        .file-item:hover { background: #f0f0f0; }
+        .file-info { flex: 1; margin-left: 15px; }
+        .file-name { font-weight: 500; margin-bottom: 5px; }
+        .file-size { font-size: 14px; color: #666; }
+        .file-actions { display: flex; gap: 10px; }
+        .drag-handle { cursor: move; font-size: 20px; color: #999; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>PDF 合并</h1>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">📄</div>
+                <h3>点击或拖拽上传多个 PDF 文件</h3>
+                <p>支持最大 50MB 的 PDF 文件</p>
+            </div>
+            
+            <ul class="file-list" id="file-list"></ul>
+            
+            <button class="btn btn-primary" id="merge-btn" style="display: none; margin-top: 20px;">合并 PDF</button>
+        </div>
+    </div>
+
+    <script>
+        class PDFMergeTool {
+            constructor() {
+                this.uploader = new FileUploader({ multiple: true });
+                this.progress = new ProgressIndicator();
+                this.files = [];
+                
+                this._initElements();
+                this._bindEvents();
+            }
+
+            _initElements() {
+                this.uploadArea = document.getElementById('upload-area');
+                this.fileList = document.getElementById('file-list');
+                this.mergeBtn = document.getElementById('merge-btn');
+            }
+
+            _bindEvents() {
+                this.uploadArea.addEventListener('click', () => {
+                    this.uploader.selectFiles().then(files => {
+                        this.addFiles(files);
+                    }).catch(err => {});
+                });
+
+                this.uploader.setupDropZone(this.uploadArea, (files) => {
+                    this.addFiles(files);
+                });
+
+                this.mergeBtn.addEventListener('click', () => {
+                    this.mergePDFs();
+                });
+            }
+
+            addFiles(newFiles) {
+                this.files.push(...newFiles);
+                this._renderFileList();
+                this.mergeBtn.style.display = this.files.length > 1 ? 'block' : 'none';
+            }
+
+            removeFile(index) {
+                this.files.splice(index, 1);
+                this._renderFileList();
+                this.mergeBtn.style.display = this.files.length > 1 ? 'block' : 'none';
+            }
+
+            _renderFileList() {
+                this.fileList.innerHTML = '';
+                this.files.forEach((file, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'file-item';
+                    li.innerHTML = `
+                        <span class="drag-handle">☰</span>
+                        <div class="file-info">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-size">${Utils.formatFileSize(file.size)}</div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn btn-danger" onclick="tool.removeFile(${index})">删除</button>
+                        </div>
+                    `;
+                    this.fileList.appendChild(li);
+                });
+            }
+
+            async mergePDFs() {
+                try {
+                    this.progress.show('合并 PDF 文件...');
+                    
+                    const mergedPdf = await PDFLib.PDFDocument.create();
+                    
+                    for (let i = 0; i < this.files.length; i++) {
+                        this.progress.update((i / this.files.length) * 100, `处理第 ${i + 1}/${this.files.length} 个文件...`);
+                        
+                        const arrayBuffer = await this.uploader.readAsArrayBuffer(this.files[i]);
+                        const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
+                        const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                        copiedPages.forEach(page => mergedPdf.addPage(page));
+                    }
+                    
+                    const mergedPdfBytes = await mergedPdf.save();
+                    const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
+                    
+                    Utils.downloadFile(blob, 'merged.pdf');
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('PDF 合并成功！');
+                    
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('PDF 合并失败: ' + error.message);
+                    console.error(error);
+                }
+            }
+        }
+
+        let tool;
+        document.addEventListener('DOMContentLoaded', () => {
+            tool = new PDFMergeTool();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>添加水印 - 图片工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>添加水印</h1>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card" id="upload-section">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">🖼️</div>
+                <h3>点击或拖拽上传图片</h3>
+            </div>
+        </div>
+
+        <div class="card" id="process-section" style="display: none;">
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+                <div>
+                    <div class="image-viewer">
+                        <canvas id="preview-canvas"></canvas>
+                    </div>
+                </div>
+                <div>
+                    <div class="input-group">
+                        <label>水印文字</label>
+                        <input type="text" id="watermark-text" placeholder="输入水印文字" value="水印">
+                    </div>
+                    
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>字体大小</span>
+                            <span id="font-size-value">48px</span>
+                        </div>
+                        <input type="range" id="font-size-slider" class="slider" min="12" max="120" value="48">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label>文字颜色</label>
+                        <input type="color" id="text-color" value="#ffffff">
+                    </div>
+                    
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>透明度</span>
+                            <span id="opacity-value">50%</span>
+                        </div>
+                        <input type="range" id="opacity-slider" class="slider" min="0" max="100" value="50">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label>位置</label>
+                        <select id="position-select">
+                            <option value="center">居中</option>
+                            <option value="top-left">左上</option>
+                            <option value="top-right">右上</option>
+                            <option value="bottom-left">左下</option>
+                            <option value="bottom-right">右下</option>
+                        </select>
+                    </div>
+                    
+                    <button class="btn btn-primary" id="apply-btn" style="width: 100%; margin-top: 20px;">应用水印</button>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="btn btn-secondary" id="download-btn">下载图片</button>
+                <button class="btn" id="reset-btn" style="margin-left: 10px;">重新上传</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ImageWatermarkTool {
+            constructor() {
+                this.uploader = new ImageUploader({ multiple: false });
+                this.progress = new ProgressIndicator();
+                this.originalCanvas = null;
+                this.watermarkedCanvas = null;
+                
+                this._initElements();
+                this._bindEvents();
+            }
+
+            _initElements() {
+                this.uploadArea = document.getElementById('upload-area');
+                this.uploadSection = document.getElementById('upload-section');
+                this.processSection = document.getElementById('process-section');
+                this.previewCanvas = document.getElementById('preview-canvas');
+                this.watermarkText = document.getElementById('watermark-text');
+                this.fontSizeSlider = document.getElementById('font-size-slider');
+                this.fontSizeValue = document.getElementById('font-size-value');
+                this.textColor = document.getElementById('text-color');
+                this.opacitySlider = document.getElementById('opacity-slider');
+                this.opacityValue = document.getElementById('opacity-value');
+                this.positionSelect = document.getElementById('position-select');
+            }
+
+            _bindEvents() {
+                this.uploadArea.addEventListener('click', () => {
+                    this.uploader.selectFiles().then(files => this.loadImage(files[0])).catch(err => {});
+                });
+
+                this.uploader.setupDropZone(this.uploadArea, (files) => this.loadImage(files[0]));
+
+                this.fontSizeSlider.addEventListener('input', (e) => {
+                    this.fontSizeValue.textContent = e.target.value + 'px';
+                    this.updatePreview();
+                });
+
+                this.opacitySlider.addEventListener('input', (e) => {
+                    this.opacityValue.textContent = e.target.value + '%';
+                    this.updatePreview();
+                });
+
+                this.watermarkText.addEventListener('input', () => this.updatePreview());
+                this.textColor.addEventListener('input', () => this.updatePreview());
+                this.positionSelect.addEventListener('change', () => this.updatePreview());
+
+                document.getElementById('apply-btn').addEventListener('click', () => this.applyWatermark());
+                document.getElementById('download-btn').addEventListener('click', () => this.downloadImage());
+                document.getElementById('reset-btn').addEventListener('click', () => this.reset());
+            }
+
+            async loadImage(file) {
+                try {
+                    this.progress.show('加载图片...');
+                    
+                    this.originalFile = file;
+                    const dataURL = await this.uploader.readAsDataURL(file);
+                    
+                    this.originalCanvas = document.createElement('canvas');
+                    await Utils.loadImageToCanvas(dataURL, this.originalCanvas);
+                    
+                    this.updatePreview();
+                    
+                    this.uploadSection.style.display = 'none';
+                    this.processSection.style.display = 'block';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('图片加载成功！');
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('图片加载失败: ' + error.message);
+                }
+            }
+
+            updatePreview() {
+                if (!this.originalCanvas) return;
+                
+                this.previewCanvas.width = this.originalCanvas.width;
+                this.previewCanvas.height = this.originalCanvas.height;
+                
+                const ctx = this.previewCanvas.getContext('2d');
+                ctx.drawImage(this.originalCanvas, 0, 0);
+                
+                // 绘制水印
+                const text = this.watermarkText.value;
+                const fontSize = parseInt(this.fontSizeSlider.value);
+                const color = this.textColor.value;
+                const opacity = parseInt(this.opacitySlider.value) / 100;
+                const position = this.positionSelect.value;
+                
+                ctx.font = `${fontSize}px Arial`;
+                ctx.fillStyle = color;
+                ctx.globalAlpha = opacity;
+                
+                const textWidth = ctx.measureText(text).width;
+                let x, y;
+                
+                switch (position) {
+                    case 'center':
+                        x = (this.previewCanvas.width - textWidth) / 2;
+                        y = this.previewCanvas.height / 2;
+                        break;
+                    case 'top-left':
+                        x = 20;
+                        y = fontSize + 20;
+                        break;
+                    case 'top-right':
+                        x = this.previewCanvas.width - textWidth - 20;
+                        y = fontSize + 20;
+                        break;
+                    case 'bottom-left':
+                        x = 20;
+                        y = this.previewCanvas.height - 20;
+                        break;
+                    case 'bottom-right':
+                        x = this.previewCanvas.width - textWidth - 20;
+                        y = this.previewCanvas.height - 20;
+                        break;
+                }
+                
+                ctx.fillText(text, x, y);
+                ctx.globalAlpha = 1;
+            }
+
+            applyWatermark() {
+                this.watermarkedCanvas = document.createElement('canvas');
+                this.watermarkedCanvas.width = this.previewCanvas.width;
+                this.watermarkedCanvas.height = this.previewCanvas.height;
+                
+                const ctx = this.watermarkedCanvas.getContext('2d');
+                ctx.drawImage(this.previewCanvas, 0, 0);
+                
+                Utils.showSuccess('水印已应用！');
+            }
+
+            async downloadImage() {
+                try {
+                    const canvas = this.watermarkedCanvas || this.previewCanvas;
+                    const blob = await Utils.canvasToBlob(canvas, 'image/png');
+                    const fileName = this.originalFile.name.replace(/\.[^/.]+$/, '') + '-watermark.png';
+                    Utils.downloadFile(blob, fileName);
+                    Utils.showSuccess('下载成功！');
+                } catch (error) {
+                    Utils.showError('下载失败: ' + error.message);
+                }
+            }
+
+            reset() {
+                this.uploadSection.style.display = 'block';
+                this.processSection.style.display = 'none';
+                this.originalCanvas = null;
+                this.watermarkedCanvas = null;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new ImageWatermarkTool();
+        });
+    </script>
+</body>
+</html>

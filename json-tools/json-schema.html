@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Schema - JSON 工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/ajv@8/dist/2020.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>JSON Schema 生成与校验</h1>
+            <p>根据 JSON 自动生成 Schema，或使用 Schema 验证 JSON 数据</p>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="generate-schema">生成 Schema</button>
+            <button class="tab" data-tab="validate-schema">验证 Schema</button>
+        </div>
+
+        <div class="tab-content active" id="generate-schema">
+            <div class="card">
+                <div class="editor-container">
+                    <label class="editor-label">输入 JSON 数据</label>
+                    <textarea id="json-for-schema" class="editor" placeholder="在此输入 JSON 数据，将自动生成对应的 Schema..."></textarea>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="generate-btn">生成 Schema</button>
+                    <button class="btn btn-secondary" id="upload-json-schema-btn">上传 JSON 文件</button>
+                </div>
+            </div>
+
+            <div class="card" id="schema-output-section" style="display: none;">
+                <div class="editor-container">
+                    <label class="editor-label">生成的 Schema</label>
+                    <textarea id="schema-output" class="editor" readonly></textarea>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-secondary" id="copy-schema-btn">复制</button>
+                    <button class="btn btn-secondary" id="download-schema-btn">下载 Schema</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="validate-schema">
+            <div class="split-view">
+                <div class="card">
+                    <div class="editor-container">
+                        <label class="editor-label">JSON Schema</label>
+                        <textarea id="schema-input" class="editor" placeholder="在此输入 JSON Schema..."></textarea>
+                    </div>
+                    <button class="btn btn-secondary" id="upload-schema-btn" style="margin-top: 10px;">上传 Schema</button>
+                </div>
+
+                <div class="card">
+                    <div class="editor-container">
+                        <label class="editor-label">待验证的 JSON 数据</label>
+                        <textarea id="json-to-validate" class="editor" placeholder="在此输入待验证的 JSON 数据..."></textarea>
+                    </div>
+                    <button class="btn btn-secondary" id="upload-json-validate-btn" style="margin-top: 10px;">上传 JSON</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <button class="btn btn-primary" id="validate-btn">验证</button>
+            </div>
+
+            <div class="card" id="validation-result-section" style="display: none;">
+                <h3 id="validation-title">验证结果</h3>
+                <div id="validation-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+    <script>
+        class JSONSchemaTool {
+            constructor() {
+                this.fileHandler = new FileHandler();
+                this._initElements();
+                this._bindEvents();
+                
+                // 初始化 Ajv
+                if (typeof window.ajv8 !== 'undefined') {
+                    this.ajv = new window.ajv8.default();
+                }
+            }
+
+            _initElements() {
+                this.jsonForSchema = document.getElementById('json-for-schema');
+                this.schemaOutput = document.getElementById('schema-output');
+                this.schemaInput = document.getElementById('schema-input');
+                this.jsonToValidate = document.getElementById('json-to-validate');
+                this.schemaOutputSection = document.getElementById('schema-output-section');
+                this.validationResultSection = document.getElementById('validation-result-section');
+                this.validationTitle = document.getElementById('validation-title');
+                this.validationContent = document.getElementById('validation-content');
+            }
+
+            _bindEvents() {
+                // 选项卡切换
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        this.switchTab(e.target.dataset.tab);
+                    });
+                });
+
+                // 生成 Schema
+                document.getElementById('generate-btn').addEventListener('click', () => {
+                    this.generateSchema();
+                });
+
+                // 验证
+                document.getElementById('validate-btn').addEventListener('click', () => {
+                    this.validateWithSchema();
+                });
+
+                // 上传按钮
+                document.getElementById('upload-json-schema-btn').addEventListener('click', async () => {
+                    await this.uploadFile(this.jsonForSchema);
+                });
+
+                document.getElementById('upload-schema-btn').addEventListener('click', async () => {
+                    await this.uploadFile(this.schemaInput);
+                });
+
+                document.getElementById('upload-json-validate-btn').addEventListener('click', async () => {
+                    await this.uploadFile(this.jsonToValidate);
+                });
+
+                // 复制和下载
+                document.getElementById('copy-schema-btn').addEventListener('click', async () => {
+                    await this.fileHandler.copyToClipboard(this.schemaOutput.value);
+                });
+
+                document.getElementById('download-schema-btn').addEventListener('click', () => {
+                    this.downloadFile(this.schemaOutput.value, 'schema.json');
+                });
+            }
+
+            switchTab(tabId) {
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+
+                document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+                document.getElementById(tabId).classList.add('active');
+            }
+
+            generateSchema() {
+                const input = this.jsonForSchema.value.trim();
+                
+                if (!input) {
+                    Utils.showError('请输入 JSON 数据');
+                    return;
+                }
+
+                try {
+                    Utils.showLoading('生成中...');
+                    const obj = JSON.parse(input);
+                    const schema = Utils.generateSchema(obj);
+                    this.schemaOutput.value = JSON.stringify(schema, null, 2);
+                    this.schemaOutputSection.style.display = 'block';
+                    this.jsonForSchema.classList.remove('error');
+                    Utils.hideLoading();
+                    Utils.showSuccess('Schema 生成成功');
+                } catch (error) {
+                    Utils.hideLoading();
+                    this.jsonForSchema.classList.add('error');
+                    Utils.showError('生成失败: ' + error.message);
+                    this.schemaOutputSection.style.display = 'none';
+                }
+            }
+
+            validateWithSchema() {
+                const schemaStr = this.schemaInput.value.trim();
+                const jsonStr = this.jsonToValidate.value.trim();
+                
+                if (!schemaStr || !jsonStr) {
+                    Utils.showError('请输入 Schema 和 JSON 数据');
+                    return;
+                }
+
+                if (!this.ajv) {
+                    Utils.showError('Schema 验证库未加载');
+                    return;
+                }
+
+                try {
+                    Utils.showLoading('验证中...');
+                    
+                    const schema = JSON.parse(schemaStr);
+                    const data = JSON.parse(jsonStr);
+                    
+                    const validate = this.ajv.compile(schema);
+                    const valid = validate(data);
+                    
+                    if (valid) {
+                        this.showValidationSuccess();
+                    } else {
+                        this.showValidationErrors(validate.errors);
+                    }
+                    
+                    this.schemaInput.classList.remove('error');
+                    this.jsonToValidate.classList.remove('error');
+                    this.validationResultSection.style.display = 'block';
+                    Utils.hideLoading();
+                } catch (error) {
+                    Utils.hideLoading();
+                    Utils.showError('验证失败: ' + error.message);
+                    this.validationResultSection.style.display = 'none';
+                }
+            }
+
+            showValidationSuccess() {
+                this.validationTitle.textContent = '✓ 验证成功';
+                this.validationTitle.style.color = '#4CAF50';
+                this.validationContent.innerHTML = `
+                    <div style="background-color: #E8F5E9; padding: 15px; border-radius: 4px; border-left: 4px solid #4CAF50;">
+                        <p style="margin: 0;">JSON 数据符合 Schema 定义</p>
+                    </div>
+                `;
+            }
+
+            showValidationErrors(errors) {
+                this.validationTitle.textContent = '✗ 验证失败';
+                this.validationTitle.style.color = '#F44336';
+                
+                const errorList = errors.map(err => `
+                    <div style="background-color: #FFEBEE; padding: 10px; border-radius: 4px; margin-bottom: 10px; border-left: 4px solid #F44336;">
+                        <p style="margin: 0 0 5px 0; font-weight: 500;">路径: ${err.instancePath || '/'}</p>
+                        <p style="margin: 0; color: #757575;">${err.message}</p>
+                    </div>
+                `).join('');
+                
+                this.validationContent.innerHTML = errorList;
+            }
+
+            async uploadFile(editor) {
+                try {
+                    const file = await this.fileHandler.uploadFile(['.json', '.txt']);
+                    const content = await this.fileHandler.readAsText(file);
+                    editor.value = content;
+                    Utils.showSuccess('文件上传成功');
+                } catch (error) {
+                    if (error.message !== '未选择文件') {
+                        Utils.showError('文件上传失败: ' + error.message);
+                    }
+                }
+            }
+
+            downloadFile(content, filename) {
+                if (!content) {
+                    Utils.showError('没有可下载的内容');
+                    return;
+                }
+                this.fileHandler.downloadFile(content, Utils.generateFilename(filename.split('.')[0], filename.split('.')[1]));
+                Utils.showSuccess('文件下载成功');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new JSONSchemaTool();
+        });
+    </script>
+</body>
+</html>

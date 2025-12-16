@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片裁剪 - 图片工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+    <style>
+        /* 导航栏样式 */
+        .nav-bar {
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 0;
+            margin-bottom: 20px;
+        }
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .nav-item {
+            position: relative;
+            padding: 15px 20px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .nav-item:hover {
+            background: #f5f5f5;
+        }
+        .nav-item > a {
+            text-decoration: none;
+            color: #333;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            min-width: 180px;
+            z-index: 1000;
+            border-radius: 4px;
+            padding: 8px 0;
+        }
+        .nav-item:hover .dropdown {
+            display: block;
+        }
+        .dropdown a {
+            display: block;
+            padding: 10px 20px;
+            color: #333;
+            text-decoration: none;
+            transition: background 0.2s;
+            font-size: 14px;
+        }
+        .dropdown a:hover {
+            background: #f0f0f0;
+        }
+        #crop-canvas { border: 1px solid #ddd; cursor: crosshair; max-width: 100%; }
+        .crop-box { position: absolute; border: 2px dashed #4a90e2; background: rgba(74, 144, 226, 0.1); }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="nav-bar">
+        <div class="nav-container">
+            <div class="nav-item">
+                <a href="../image-tools/index.html">图片处理工具</a>
+                <div class="dropdown">
+                    <a href="../image-tools/image-compress.html">图片压缩</a>
+                    <a href="../image-tools/image-rotate.html">旋转翻转</a>
+                    <a href="../image-tools/image-convert.html">格式转换</a>
+                    <a href="../image-tools/image-watermark.html">添加水印</a>
+                    <a href="../image-tools/image-resize.html">尺寸调整</a>
+                    <a href="../image-tools/image-merge.html">图片拼接</a>
+                    <a href="../image-tools/image-crop.html">图片裁剪</a>
+                    <a href="../image-tools/image-exif.html">EXIF清理</a>
+                </div>
+            </div>
+            <div class="nav-item">
+                <a href="../pdf-tools/pdf-preview.html">PDF工具</a>
+                <div class="dropdown">
+                    <a href="../pdf-tools/pdf-merge.html">PDF合并</a>
+                    <a href="../pdf-tools/pdf-split.html">PDF拆分</a>
+                    <a href="../pdf-tools/pdf-compress.html">PDF压缩</a>
+                    <a href="../pdf-tools/pdf-watermark.html">添加水印</a>
+                    <a href="../pdf-tools/pdf-to-image.html">PDF转图片</a>
+                    <a href="../pdf-tools/pdf-reorder.html">页面重排</a>
+                    <a href="../pdf-tools/pdf-annotate.html">PDF标注</a>
+                    <a href="../pdf-tools/pdf-preview.html">PDF预览</a>
+                </div>
+            </div>
+            <div class="nav-item">
+                <a href="../json-tools/json-formatter.html">JSON工具</a>
+                <div class="dropdown">
+                    <a href="../json-tools/json-formatter.html">JSON格式化</a>
+                    <a href="../json-tools/json-validator.html">JSON验证</a>
+                    <a href="../json-tools/json-diff.html">JSON对比</a>
+                    <a href="../json-tools/json-csv-converter.html">JSON/CSV转换</a>
+                    <a href="../json-tools/json-xml-converter.html">JSON/XML转换</a>
+                    <a href="../json-tools/json-schema.html">JSON Schema</a>
+                </div>
+            </div>
+            <div class="nav-item">
+                <a href="../code-tools/json-tools.html">代码格式转换工具</a>
+                <div class="dropdown">
+                    <a href="../code-tools/base64-image.html">Base64图片</a>
+                    <a href="../code-tools/url-codec.html">URL编解码</a>
+                    <a href="../code-tools/jwt-parser.html">JWT解析</a>
+                    <a href="../code-tools/markdown-html.html">Markdown/HTML</a>
+                    <a href="../code-tools/table-converter.html">表格转换</a>
+                    <a href="../code-tools/text-diff.html">文本对比</a>
+                </div>
+            </div>
+            <div class="nav-item">
+                <a href="../text-tools/text-clean.html">文本数字工具</a>
+                <div class="dropdown">
+                    <a href="../text-tools/text-clean.html">文本清理</a>
+                    <a href="../text-tools/text-replace.html">文本替换</a>
+                    <a href="../text-tools/text-split.html">文本分割</a>
+                    <a href="../text-tools/text-sort.html">文本排序</a>
+                    <a href="../text-tools/text-dedup.html">文本去重</a>
+                    <a href="../text-tools/text-stats.html">文本统计</a>
+                    <a href="../text-tools/random-gen.html">随机生成</a>
+                    <a href="../text-tools/emoji-convert.html">Emoji转换</a>
+                </div>
+            </div>
+            <div class="nav-item">
+                <a href="../finance-tools/salary-tax.html">财税工具</a>
+                <div class="dropdown">
+                    <a href="../finance-tools/salary-tax.html">工资个税</a>
+                    <a href="../finance-tools/income-tax.html">综合所得个税</a>
+                    <a href="../finance-tools/bonus-tax.html">年终奖个税</a>
+                    <a href="../finance-tools/corp-tax.html">企业所得税</a>
+                    <a href="../finance-tools/vat-calculator.html">增值税计算</a>
+                    <a href="../finance-tools/mortgage.html">房贷计算</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>图片裁剪</h1>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card" id="upload-section">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">🖼️</div>
+                <h3>点击或拖拽上传图片</h3>
+            </div>
+        </div>
+
+        <div class="card" id="process-section" style="display: none;">
+            <div class="input-group">
+                <label>裁剪比例</label>
+                <select id="ratio-select">
+                    <option value="free">自由</option>
+                    <option value="1:1">1:1 (正方形)</option>
+                    <option value="4:3">4:3</option>
+                    <option value="16:9">16:9</option>
+                </select>
+            </div>
+            
+            <div style="position: relative; display: inline-block; margin: 20px 0;">
+                <canvas id="crop-canvas"></canvas>
+            </div>
+            
+            <p id="crop-info" style="color: #666; font-size: 14px;"></p>
+            
+            <div style="margin-top: 20px;">
+                <button class="btn btn-primary" id="crop-btn">裁剪图片</button>
+                <button class="btn btn-secondary" id="reset-btn" style="margin-left: 10px;">重新上传</button>
+            </div>
+
+            <div id="result-section" style="display: none; margin-top: 30px;">
+                <h3>裁剪结果</h3>
+                <div class="image-viewer">
+                    <canvas id="result-canvas"></canvas>
+                </div>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="btn btn-secondary" id="download-btn">下载图片</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ImageCropTool {
+            constructor() {
+                this.uploader = new ImageUploader({ multiple: false });
+                this.progress = new ProgressIndicator();
+                this.canvas = null;
+                this.cropArea = { x: 0, y: 0, width: 0, height: 0 };
+                this.isDragging = false;
+                this.startX = 0;
+                this.startY = 0;
+                
+                this._initElements();
+                this._bindEvents();
+            }
+
+            _initElements() {
+                this.uploadArea = document.getElementById('upload-area');
+                this.uploadSection = document.getElementById('upload-section');
+                this.processSection = document.getElementById('process-section');
+                this.cropCanvas = document.getElementById('crop-canvas');
+                this.ratioSelect = document.getElementById('ratio-select');
+                this.cropInfo = document.getElementById('crop-info');
+                this.resultSection = document.getElementById('result-section');
+                this.resultCanvas = document.getElementById('result-canvas');
+            }
+
+            _bindEvents() {
+                this.uploadArea.addEventListener('click', () => {
+                    this.uploader.selectFiles().then(files => this.loadImage(files[0])).catch(err => {});
+                });
+
+                this.uploader.setupDropZone(this.uploadArea, (files) => this.loadImage(files[0]));
+
+                // 鼠标事件
+                this.cropCanvas.addEventListener('mousedown', (e) => this.startCrop(e));
+                this.cropCanvas.addEventListener('mousemove', (e) => this.updateCrop(e));
+                this.cropCanvas.addEventListener('mouseup', () => this.endCrop());
+
+                document.getElementById('crop-btn').addEventListener('click', () => this.cropImage());
+                document.getElementById('reset-btn').addEventListener('click', () => this.reset());
+                document.getElementById('download-btn').addEventListener('click', () => this.downloadImage());
+            }
+
+            async loadImage(file) {
+                try {
+                    this.progress.show('加载图片...');
+                    
+                    this.originalFile = file;
+                    const dataURL = await this.uploader.readAsDataURL(file);
+                    const img = await Utils.loadImageToCanvas(dataURL, this.cropCanvas);
+                    
+                    // 默认选择整个图片
+                    this.cropArea = { x: 0, y: 0, width: img.width, height: img.height };
+                    this.updateCropInfo();
+                    
+                    this.uploadSection.style.display = 'none';
+                    this.processSection.style.display = 'block';
+                    this.resultSection.style.display = 'none';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('图片加载成功！拖动鼠标选择裁剪区域');
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('图片加载失败: ' + error.message);
+                }
+            }
+
+            startCrop(e) {
+                const rect = this.cropCanvas.getBoundingClientRect();
+                this.startX = e.clientX - rect.left;
+                this.startY = e.clientY - rect.top;
+                this.isDragging = true;
+            }
+
+            updateCrop(e) {
+                if (!this.isDragging) return;
+                
+                const rect = this.cropCanvas.getBoundingClientRect();
+                const currentX = e.clientX - rect.left;
+                const currentY = e.clientY - rect.top;
+                
+                this.cropArea.x = Math.min(this.startX, currentX);
+                this.cropArea.y = Math.min(this.startY, currentY);
+                this.cropArea.width = Math.abs(currentX - this.startX);
+                this.cropArea.height = Math.abs(currentY - this.startY);
+                
+                // 应用比例约束
+                const ratio = this.ratioSelect.value;
+                if (ratio !== 'free') {
+                    const [w, h] = ratio.split(':').map(Number);
+                    this.cropArea.height = this.cropArea.width * h / w;
+                }
+                
+                this.drawCropOverlay();
+                this.updateCropInfo();
+            }
+
+            endCrop() {
+                this.isDragging = false;
+            }
+
+            drawCropOverlay() {
+                const ctx = this.cropCanvas.getContext('2d');
+                const img = new Image();
+                img.src = this.cropCanvas.toDataURL();
+                img.onload = () => {
+                    ctx.clearRect(0, 0, this.cropCanvas.width, this.cropCanvas.height);
+                    ctx.drawImage(img, 0, 0);
+                    
+                    // 绘制半透明遮罩
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.fillRect(0, 0, this.cropCanvas.width, this.cropCanvas.height);
+                    
+                    // 清除裁剪区域
+                    ctx.clearRect(this.cropArea.x, this.cropArea.y, this.cropArea.width, this.cropArea.height);
+                    ctx.drawImage(img, this.cropArea.x, this.cropArea.y, this.cropArea.width, this.cropArea.height,
+                                  this.cropArea.x, this.cropArea.y, this.cropArea.width, this.cropArea.height);
+                    
+                    // 绘制边框
+                    ctx.strokeStyle = '#4a90e2';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(this.cropArea.x, this.cropArea.y, this.cropArea.width, this.cropArea.height);
+                };
+            }
+
+            updateCropInfo() {
+                this.cropInfo.textContent = `裁剪区域: ${Math.round(this.cropArea.width)} × ${Math.round(this.cropArea.height)}`;
+            }
+
+            async cropImage() {
+                try {
+                    this.progress.show('裁剪图片...');
+                    
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = this.cropArea.width;
+                    tempCanvas.height = this.cropArea.height;
+                    
+                    const ctx = tempCanvas.getContext('2d');
+                    ctx.drawImage(this.cropCanvas, 
+                        this.cropArea.x, this.cropArea.y, this.cropArea.width, this.cropArea.height,
+                        0, 0, this.cropArea.width, this.cropArea.height);
+                    
+                    this.resultCanvas.width = this.cropArea.width;
+                    this.resultCanvas.height = this.cropArea.height;
+                    const resultCtx = this.resultCanvas.getContext('2d');
+                    resultCtx.drawImage(tempCanvas, 0, 0);
+                    
+                    this.croppedBlob = await Utils.canvasToBlob(tempCanvas, 'image/png');
+                    this.resultSection.style.display = 'block';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('图片裁剪完成！');
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('图片裁剪失败: ' + error.message);
+                }
+            }
+
+            downloadImage() {
+                if (this.croppedBlob) {
+                    const fileName = this.originalFile.name.replace(/\.[^/.]+$/, '') + '-cropped.png';
+                    Utils.downloadFile(this.croppedBlob, fileName);
+                    Utils.showSuccess('下载成功！');
+                }
+            }
+
+            reset() {
+                this.uploadSection.style.display = 'block';
+                this.processSection.style.display = 'none';
+                this.resultSection.style.display = 'none';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new ImageCropTool();
+        });
+    </script>
+</body>
+</html>

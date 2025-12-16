@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EXIF 清理 - 图片工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>EXIF 信息清理</h1>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card" id="upload-section">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">🖼️</div>
+                <h3>点击或拖拽上传图片</h3>
+                <p style="color: #666; font-size: 14px; margin-top: 10px;">支持 JPG 格式</p>
+            </div>
+        </div>
+
+        <div class="card" id="process-section" style="display: none;">
+            <h3>EXIF 信息</h3>
+            <div id="exif-info" style="background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 15px 0;">
+                <p style="color: #666;">正在读取...</p>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <button class="btn btn-danger" id="clean-btn">清理 EXIF 信息</button>
+                <button class="btn btn-secondary" id="reset-btn" style="margin-left: 10px;">重新上传</button>
+            </div>
+
+            <div id="result-section" style="display: none; margin-top: 30px;">
+                <h3>清理结果</h3>
+                <p style="color: #50c878; margin: 15px 0;">✓ EXIF 信息已清理</p>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="btn btn-secondary" id="download-btn">下载清理后的图片</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ImageExifTool {
+            constructor() {
+                this.uploader = new ImageUploader({ multiple: false });
+                this.progress = new ProgressIndicator();
+                this.originalCanvas = null;
+                this.cleanedBlob = null;
+                
+                this._initElements();
+                this._bindEvents();
+            }
+
+            _initElements() {
+                this.uploadArea = document.getElementById('upload-area');
+                this.uploadSection = document.getElementById('upload-section');
+                this.processSection = document.getElementById('process-section');
+                this.exifInfo = document.getElementById('exif-info');
+                this.resultSection = document.getElementById('result-section');
+            }
+
+            _bindEvents() {
+                this.uploadArea.addEventListener('click', () => {
+                    this.uploader.selectFiles().then(files => this.loadImage(files[0])).catch(err => {});
+                });
+
+                this.uploader.setupDropZone(this.uploadArea, (files) => this.loadImage(files[0]));
+
+                document.getElementById('clean-btn').addEventListener('click', () => this.cleanExif());
+                document.getElementById('download-btn').addEventListener('click', () => this.downloadImage());
+                document.getElementById('reset-btn').addEventListener('click', () => this.reset());
+            }
+
+            async loadImage(file) {
+                try {
+                    this.progress.show('加载图片...');
+                    
+                    this.originalFile = file;
+                    const dataURL = await this.uploader.readAsDataURL(file);
+                    
+                    this.originalCanvas = document.createElement('canvas');
+                    await Utils.loadImageToCanvas(dataURL, this.originalCanvas);
+                    
+                    // 读取 EXIF 信息
+                    this.readExif(file);
+                    
+                    this.uploadSection.style.display = 'none';
+                    this.processSection.style.display = 'block';
+                    this.resultSection.style.display = 'none';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('图片加载成功！');
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('图片加载失败: ' + error.message);
+                }
+            }
+
+            readExif(file) {
+                const img = new Image();
+                img.src = URL.createObjectURL(file);
+                
+                img.onload = () => {
+                    EXIF.getData(img, () => {
+                        const allTags = EXIF.getAllTags(img);
+                        
+                        if (Object.keys(allTags).length === 0) {
+                            this.exifInfo.innerHTML = '<p style="color: #999;">无 EXIF 信息</p>';
+                        } else {
+                            let html = '<table style="width: 100%; font-size: 14px;">';
+                            
+                            const importantTags = ['Make', 'Model', 'DateTime', 'GPSLatitude', 'GPSLongitude', 'PixelXDimension', 'PixelYDimension'];
+                            
+                            importantTags.forEach(tag => {
+                                if (allTags[tag]) {
+                                    html += `<tr><td style="padding: 5px; font-weight: 500;">${tag}:</td><td style="padding: 5px;">${allTags[tag]}</td></tr>`;
+                                }
+                            });
+                            
+                            html += '</table>';
+                            this.exifInfo.innerHTML = html;
+                        }
+                    });
+                    
+                    URL.revokeObjectURL(img.src);
+                };
+            }
+
+            async cleanExif() {
+                try {
+                    this.progress.show('清理 EXIF...');
+                    
+                    // 通过 Canvas 重绘自动移除 EXIF
+                    this.cleanedBlob = await Utils.canvasToBlob(this.originalCanvas, 'image/jpeg', 0.95);
+                    
+                    this.resultSection.style.display = 'block';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('EXIF 信息已清理！');
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('EXIF 清理失败: ' + error.message);
+                }
+            }
+
+            downloadImage() {
+                if (this.cleanedBlob) {
+                    const fileName = this.originalFile.name.replace(/\.[^/.]+$/, '') + '-no-exif.jpg';
+                    Utils.downloadFile(this.cleanedBlob, fileName);
+                    Utils.showSuccess('下载成功！');
+                }
+            }
+
+            reset() {
+                this.uploadSection.style.display = 'block';
+                this.processSection.style.display = 'none';
+                this.resultSection.style.display = 'none';
+                this.originalCanvas = null;
+                this.cleanedBlob = null;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new ImageExifTool();
+        });
+    </script>
+</body>
+</html>

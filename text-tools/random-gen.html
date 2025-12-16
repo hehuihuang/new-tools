@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>随机文本生成 - 在线工具箱</title>
+  <link rel="stylesheet" href="shared/styles.css">
+  <style>
+    .options-panel {
+      display: none;
+      margin-top: 15px;
+      padding: 15px;
+      background: #f5f5f5;
+      border-radius: 8px;
+    }
+    .options-panel.active {
+      display: block;
+    }
+    .option-row {
+      margin-bottom: 10px;
+    }
+    .option-row label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+      <h1>随机文本生成工具</h1>
+      <p>生成随机密码、字符串、UUID、Lorem Ipsum等测试数据</p>
+      <div class="privacy-notice">🔒 所有处理均在本地完成，数据不会上传</div>
+    </header>
+
+    <div class="card">
+      <div class="card-title">生成类型</div>
+      <div class="options-group">
+        <div class="option-item">
+          <input type="radio" name="mode" id="mode-password" value="password" checked onchange="updateOptionsPanel()">
+          <label for="mode-password">随机密码</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" name="mode" id="mode-string" value="string" onchange="updateOptionsPanel()">
+          <label for="mode-string">随机字符串</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" name="mode" id="mode-uuid" value="uuid" onchange="updateOptionsPanel()">
+          <label for="mode-uuid">UUID</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" name="mode" id="mode-lorem" value="lorem" onchange="updateOptionsPanel()">
+          <label for="mode-lorem">Lorem Ipsum</label>
+        </div>
+      </div>
+
+      <!-- 密码选项 -->
+      <div id="options-password" class="options-panel active">
+        <div class="option-row">
+          <label>密码长度：<span id="lengthValue">16</span></label>
+          <input type="range" id="passwordLength" min="6" max="64" value="16" style="width: 100%;" oninput="document.getElementById('lengthValue').textContent = this.value">
+        </div>
+        <div class="option-row">
+          <label style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="opt-uppercase" checked>
+            <span>包含大写字母 (A-Z)</span>
+          </label>
+        </div>
+        <div class="option-row">
+          <label style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="opt-lowercase" checked>
+            <span>包含小写字母 (a-z)</span>
+          </label>
+        </div>
+        <div class="option-row">
+          <label style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="opt-numbers" checked>
+            <span>包含数字 (0-9)</span>
+          </label>
+        </div>
+        <div class="option-row">
+          <label style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="opt-symbols">
+            <span>包含符号 (!@#$%^&*)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 字符串选项 -->
+      <div id="options-string" class="options-panel">
+        <div class="option-row">
+          <label>字符串长度：<span id="stringLengthValue">32</span></label>
+          <input type="range" id="stringLength" min="8" max="128" value="32" style="width: 100%;" oninput="document.getElementById('stringLengthValue').textContent = this.value">
+        </div>
+      </div>
+
+      <!-- Lorem Ipsum选项 -->
+      <div id="options-lorem" class="options-panel">
+        <div class="option-row">
+          <label>段落数量：<span id="paragraphValue">3</span></label>
+          <input type="range" id="paragraphCount" min="1" max="10" value="3" style="width: 100%;" oninput="document.getElementById('paragraphValue').textContent = this.value">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">生成结果</div>
+      <div class="editor-container">
+        <textarea id="output" class="editor" readonly placeholder="点击生成按钮生成随机内容..."></textarea>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="generate()">生成</button>
+        <button class="btn btn-success" onclick="copyResult()">复制结果</button>
+        <button class="btn btn-secondary" onclick="clearOutput()">清空</button>
+      </div>
+      <div id="stats" class="stats"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { showMessage, copyToClipboard, updateStats } from './shared/components.js';
+
+    window.showMessage = showMessage;
+    window.copyToClipboard = copyToClipboard;
+    window.updateStats = updateStats;
+
+    /**
+     * 生成随机密码
+     */
+    function generatePassword(options) {
+      const { length = 16, uppercase = true, lowercase = true, numbers = true, symbols = false } = options;
+      
+      let charset = '';
+      if (uppercase) charset += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      if (lowercase) charset += 'abcdefghijklmnopqrstuvwxyz';
+      if (numbers) charset += '0123456789';
+      if (symbols) charset += '!@#$%^&*()_+-=[]{}|;:,.<>?';
+      
+      if (charset.length === 0) {
+        throw new Error('请至少选择一种字符类型');
+      }
+      
+      let password = '';
+      const array = new Uint32Array(length);
+      crypto.getRandomValues(array);
+      
+      for (let i = 0; i < length; i++) {
+        password += charset[array[i] % charset.length];
+      }
+      
+      return password;
+    }
+
+    /**
+     * 生成随机字符串
+     */
+    function generateString(length) {
+      const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let result = '';
+      const array = new Uint32Array(length);
+      crypto.getRandomValues(array);
+      
+      for (let i = 0; i < length; i++) {
+        result += charset[array[i] % charset.length];
+      }
+      
+      return result;
+    }
+
+    /**
+     * 生成UUID v4
+     */
+    function generateUUID() {
+      const array = new Uint8Array(16);
+      crypto.getRandomValues(array);
+      
+      // 设置版本号 (4) 和变体位
+      array[6] = (array[6] & 0x0f) | 0x40;
+      array[8] = (array[8] & 0x3f) | 0x80;
+      
+      const hex = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+      
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    }
+
+    /**
+     * 生成Lorem Ipsum
+     */
+    function generateLorem(paragraphs) {
+      const loremText = [
+        'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
+        'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
+        'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.',
+        'Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet.',
+        'At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint occaecati cupiditate non provident, similique sunt in culpa.',
+        'Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe eveniet ut et voluptates repudiandae sint et molestiae non recusandae. Itaque earum rerum hic tenetur a sapiente delectus, ut aut reiciendis.',
+        'Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit quo minus id quod maxime placeat facere possimus, omnis voluptas assumenda est, omnis dolor repellendus.',
+        'Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur, vel illum qui dolorem eum fugiat quo voluptas nulla pariatur.',
+        'Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex ea commodi consequatur.',
+        'Et harum quidem rerum facilis est et expedita distinctio. Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit quo minus id quod maxime placeat facere possimus.'
+      ];
+      
+      const result = [];
+      for (let i = 0; i < paragraphs; i++) {
+        result.push(loremText[i % loremText.length]);
+      }
+      
+      return result.join('\n\n');
+    }
+
+    /**
+     * 更新选项面板
+     */
+    window.updateOptionsPanel = function() {
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      
+      document.querySelectorAll('.options-panel').forEach(panel => {
+        panel.classList.remove('active');
+      });
+      
+      const activePanel = document.getElementById(`options-${mode}`);
+      if (activePanel) {
+        activePanel.classList.add('active');
+      }
+    };
+
+    /**
+     * 生成
+     */
+    window.generate = function() {
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      
+      try {
+        let result;
+        let stats = {};
+        
+        switch (mode) {
+          case 'password':
+            const length = parseInt(document.getElementById('passwordLength').value);
+            const options = {
+              length,
+              uppercase: document.getElementById('opt-uppercase').checked,
+              lowercase: document.getElementById('opt-lowercase').checked,
+              numbers: document.getElementById('opt-numbers').checked,
+              symbols: document.getElementById('opt-symbols').checked
+            };
+            result = generatePassword(options);
+            stats = {
+              '类型': '随机密码',
+              '长度': length,
+              '字符类型': [
+                options.uppercase && '大写',
+                options.lowercase && '小写',
+                options.numbers && '数字',
+                options.symbols && '符号'
+              ].filter(Boolean).join('、')
+            };
+            break;
+            
+          case 'string':
+            const strLength = parseInt(document.getElementById('stringLength').value);
+            result = generateString(strLength);
+            stats = {
+              '类型': '随机字符串',
+              '长度': strLength
+            };
+            break;
+            
+          case 'uuid':
+            result = generateUUID();
+            stats = {
+              '类型': 'UUID v4',
+              '格式': 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
+            };
+            break;
+            
+          case 'lorem':
+            const paragraphs = parseInt(document.getElementById('paragraphCount').value);
+            result = generateLorem(paragraphs);
+            stats = {
+              '类型': 'Lorem Ipsum',
+              '段落数': paragraphs
+            };
+            break;
+        }
+        
+        document.getElementById('output').value = result;
+        updateStats(stats, document.getElementById('stats'));
+        showMessage('success', '生成完成');
+      } catch (error) {
+        showMessage('error', error.message);
+      }
+    };
+
+    window.clearOutput = function() {
+      document.getElementById('output').value = '';
+      document.getElementById('stats').innerHTML = '';
+    };
+
+    window.copyResult = function() {
+      const output = document.getElementById('output').value;
+      if (!output) {
+        showMessage('error', '没有可复制的内容');
+        return;
+      }
+      copyToClipboard(output);
+    };
+
+    // 导出供测试使用
+    window.generatePassword = generatePassword;
+    window.generateString = generateString;
+    window.generateUUID = generateUUID;
+    window.generateLorem = generateLorem;
+  </script>
+</body>
+</html>

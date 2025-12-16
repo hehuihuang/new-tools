@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>工资个税计算器 - 财税工具</title>
+  <link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+  <div class="container">
+    <div id="header"></div>
+
+    <div class="card">
+      <h3 class="card-title">输入信息</h3>
+      
+      <div id="salary-input"></div>
+      
+      <h4 style="margin: 20px 0 10px 0; color: var(--primary-color); font-size: 1rem;">五险一金</h4>
+      <div id="pension-input"></div>
+      <div id="medical-input"></div>
+      <div id="unemployment-input"></div>
+      <div id="housing-input"></div>
+      
+      <div id="additional-input"></div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="calculate()">计算</button>
+        <button class="btn btn-secondary" onclick="clearForm()">清空</button>
+      </div>
+    </div>
+
+    <div id="result-container" style="display: none;">
+      <div id="result-card"></div>
+      <div id="details-card"></div>
+    </div>
+  </div>
+
+  <script src="shared/components.js"></script>
+  <script src="shared/utils.js"></script>
+  <script src="shared/calculators.js"></script>
+  <script>
+    document.getElementById('header').innerHTML = createFinanceHeader(
+      '工资个税计算器',
+      '计算工资的个人所得税和税后收入'
+    );
+
+    document.getElementById('salary-input').innerHTML = createInputGroup({
+      label: '税前工资',
+      id: 'salary',
+      type: 'number',
+      placeholder: '请输入税前工资',
+      required: true,
+      min: 0,
+      step: '0.01',
+      unit: '元'
+    });
+
+    document.getElementById('pension-input').innerHTML = createInputGroup({
+      label: '养老保险',
+      id: 'pension',
+      type: 'number',
+      placeholder: '默认8%',
+      min: 0,
+      max: 100,
+      step: '0.1',
+      unit: '%',
+      value: '8'
+    });
+
+    document.getElementById('medical-input').innerHTML = createInputGroup({
+      label: '医疗保险',
+      id: 'medical',
+      type: 'number',
+      placeholder: '默认2%',
+      min: 0,
+      max: 100,
+      step: '0.1',
+      unit: '%',
+      value: '2'
+    });
+
+    document.getElementById('unemployment-input').innerHTML = createInputGroup({
+      label: '失业保险',
+      id: 'unemployment',
+      type: 'number',
+      placeholder: '默认0.5%',
+      min: 0,
+      max: 100,
+      step: '0.1',
+      unit: '%',
+      value: '0.5'
+    });
+
+    document.getElementById('housing-input').innerHTML = createInputGroup({
+      label: '住房公积金',
+      id: 'housing',
+      type: 'number',
+      placeholder: '默认12%',
+      min: 0,
+      max: 100,
+      step: '0.1',
+      unit: '%',
+      value: '12'
+    });
+
+    document.getElementById('additional-input').innerHTML = createInputGroup({
+      label: '专项附加扣除',
+      id: 'additional',
+      type: 'number',
+      placeholder: '子女教育、住房贷款等',
+      min: 0,
+      step: '100',
+      unit: '元',
+      value: '0',
+      hint: '包括子女教育、继续教育、住房贷款利息、住房租金、赡养老人等'
+    });
+
+    function calculate() {
+      clearAllInputErrors();
+      
+      const salary = document.getElementById('salary').value;
+      const pension = document.getElementById('pension').value || 8;
+      const medical = document.getElementById('medical').value || 2;
+      const unemployment = document.getElementById('unemployment').value || 0.5;
+      const housing = document.getElementById('housing').value || 12;
+      const additional = document.getElementById('additional').value || 0;
+
+      const salaryValidation = validateNumber(salary, 0);
+      if (!salaryValidation.valid) {
+        showInputError('salary', salaryValidation.error);
+        return;
+      }
+
+      const rates = {
+        pension: Number(pension) / 100,
+        medical: Number(medical) / 100,
+        unemployment: Number(unemployment) / 100,
+        housingFund: Number(housing) / 100
+      };
+
+      const socialInsurance = calculateSocialInsurance(salaryValidation.value, rates);
+      const result = calculateSalaryTax(salaryValidation.value, socialInsurance, Number(additional));
+
+      displayResults(result, socialInsurance);
+      saveToHistory('salary-tax', { salary: salaryValidation.value, rates, additional, result });
+    }
+
+    function displayResults(result, socialInsurance) {
+      const resultData = {
+        salary: {
+          label: '税前工资',
+          value: formatCurrency(result.salary) + ' 元'
+        },
+        socialInsurance: {
+          label: '五险一金',
+          value: formatCurrency(result.socialInsurance) + ' 元',
+          sub: `养老${formatCurrency(socialInsurance.pension)} + 医疗${formatCurrency(socialInsurance.medical)} + 失业${formatCurrency(socialInsurance.unemployment)} + 公积金${formatCurrency(socialInsurance.housingFund)}`
+        },
+        tax: {
+          label: '个人所得税',
+          value: formatCurrency(result.tax) + ' 元',
+          sub: `税率${formatPercent(result.rate)}`
+        },
+        afterTax: {
+          label: '税后工资',
+          value: formatCurrency(result.afterTax) + ' 元',
+          highlight: true
+        }
+      };
+
+      document.getElementById('result-card').innerHTML = createResultCard('计算结果', resultData);
+
+      const detailsHTML = createDetailsList(result.steps.map(step => ({
+        label: step.label,
+        value: typeof step.value === 'number' ? formatCurrency(step.value) : step.value,
+        formula: step.formula
+      })));
+
+      document.getElementById('details-card').innerHTML = createCollapsible(
+        '详细计算过程',
+        `<div class="card">${detailsHTML}</div>`,
+        false
+      );
+
+      document.getElementById('result-container').style.display = 'block';
+      showMessage('success', '计算完成');
+    }
+
+    function clearForm() {
+      document.getElementById('salary').value = '';
+      document.getElementById('pension').value = '8';
+      document.getElementById('medical').value = '2';
+      document.getElementById('unemployment').value = '0.5';
+      document.getElementById('housing').value = '12';
+      document.getElementById('additional').value = '0';
+      document.getElementById('result-container').style.display = 'none';
+      clearAllInputErrors();
+    }
+  </script>
+</body>
+</html>

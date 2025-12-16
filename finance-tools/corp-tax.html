@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>企业所得税计算器 - 财税工具</title>
+  <link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+  <div class="container">
+    <div id="header"></div>
+
+    <div class="card">
+      <h3 class="card-title">输入信息</h3>
+      
+      <div id="revenue-input"></div>
+      <div id="costs-input"></div>
+      <div id="increase-input"></div>
+      <div id="decrease-input"></div>
+      <div id="company-type-input"></div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="calculate()">计算</button>
+        <button class="btn btn-secondary" onclick="clearForm()">清空</button>
+      </div>
+    </div>
+
+    <div id="result-container" style="display: none;">
+      <div id="result-card"></div>
+      <div id="details-card"></div>
+    </div>
+  </div>
+
+  <script src="shared/components.js"></script>
+  <script src="shared/utils.js"></script>
+  <script src="shared/calculators.js"></script>
+  <script>
+    document.getElementById('header').innerHTML = createFinanceHeader(
+      '企业所得税计算器',
+      '计算企业所得税，支持小微企业优惠税率'
+    );
+
+    document.getElementById('revenue-input').innerHTML = createInputGroup({
+      label: '营业收入',
+      id: 'revenue',
+      type: 'number',
+      placeholder: '请输入营业收入',
+      required: true,
+      min: 0,
+      step: '0.01',
+      unit: '元'
+    });
+
+    document.getElementById('costs-input').innerHTML = createInputGroup({
+      label: '营业成本',
+      id: 'costs',
+      type: 'number',
+      placeholder: '请输入营业成本',
+      required: true,
+      min: 0,
+      step: '0.01',
+      unit: '元'
+    });
+
+    document.getElementById('increase-input').innerHTML = createInputGroup({
+      label: '纳税调增',
+      id: 'increase',
+      type: 'number',
+      placeholder: '纳税调整增加额',
+      min: 0,
+      step: '0.01',
+      unit: '元',
+      value: '0'
+    });
+
+    document.getElementById('decrease-input').innerHTML = createInputGroup({
+      label: '纳税调减',
+      id: 'decrease',
+      type: 'number',
+      placeholder: '纳税调整减少额',
+      min: 0,
+      step: '0.01',
+      unit: '元',
+      value: '0'
+    });
+
+    document.getElementById('company-type-input').innerHTML = createInputGroup({
+      label: '企业类型',
+      id: 'companyType',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 'normal', label: '一般企业（25%）' },
+        { value: 'small', label: '小微企业（优惠税率）' },
+        { value: 'hightech', label: '高新技术企业（15%）' }
+      ]
+    });
+
+    function calculate() {
+      clearAllInputErrors();
+      
+      const revenue = document.getElementById('revenue').value;
+      const costs = document.getElementById('costs').value;
+      const increase = document.getElementById('increase').value || 0;
+      const decrease = document.getElementById('decrease').value || 0;
+      const companyType = document.getElementById('companyType').value;
+
+      const revenueValidation = validateNumber(revenue, 0);
+      if (!revenueValidation.valid) {
+        showInputError('revenue', revenueValidation.error);
+        return;
+      }
+
+      const costsValidation = validateNumber(costs, 0);
+      if (!costsValidation.valid) {
+        showInputError('costs', costsValidation.error);
+        return;
+      }
+
+      const result = calculateCorporateTax(
+        revenueValidation.value,
+        costsValidation.value,
+        { increase: Number(increase), decrease: Number(decrease) },
+        companyType
+      );
+
+      displayResults(result);
+      saveToHistory('corp-tax', { revenue: revenueValidation.value, costs: costsValidation.value, increase, decrease, companyType, result });
+    }
+
+    function displayResults(result) {
+      const resultData = {
+        profit: {
+          label: '利润总额',
+          value: formatCurrency(result.profit) + ' 元'
+        },
+        taxableIncome: {
+          label: '应纳税所得额',
+          value: formatCurrency(result.taxableIncome) + ' 元'
+        },
+        tax: {
+          label: '应纳税额',
+          value: formatCurrency(result.tax) + ' 元',
+          highlight: true
+        },
+        taxBurdenRate: {
+          label: '税负率',
+          value: formatPercent(result.taxBurdenRate)
+        }
+      };
+
+      document.getElementById('result-card').innerHTML = createResultCard('计算结果', resultData);
+
+      const detailsHTML = createDetailsList(result.steps.map(step => ({
+        label: step.label,
+        value: typeof step.value === 'number' ? formatCurrency(step.value) : step.value,
+        formula: step.formula
+      })));
+
+      document.getElementById('details-card').innerHTML = createCollapsible(
+        '详细计算过程',
+        `<div class="card">${detailsHTML}</div>`,
+        false
+      );
+
+      document.getElementById('result-container').style.display = 'block';
+      showMessage('success', '计算完成');
+    }
+
+    function clearForm() {
+      document.getElementById('revenue').value = '';
+      document.getElementById('costs').value = '';
+      document.getElementById('increase').value = '0';
+      document.getElementById('decrease').value = '0';
+      document.getElementById('result-container').style.display = 'none';
+      clearAllInputErrors();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF 在线预览 - PDF 工具套件</title>
+    
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        // 配置 PDF.js - 禁用存储以避免 file:// 协议错误
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 
+                'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+    </script>
+    
+    <!-- 共享样式 -->
+    <link rel="stylesheet" href="./shared/styles.css">
+    
+    <!-- 共享工具函数 -->
+    <script src="./shared/utils.js"></script>
+    
+    <!-- 共享组件 -->
+    <script src="./shared/components.js"></script>
+    
+    <style>
+        .pdf-viewer-wrapper {
+            position: relative;
+            background: #525659;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .pdf-viewer {
+            max-height: 70vh;
+            overflow-y: auto;
+            position: relative;
+            scroll-behavior: smooth;
+        }
+        
+        .page-wrapper {
+            margin-bottom: 30px;
+            position: relative;
+            display: inline-block;
+        }
+        
+        .page-number {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            z-index: 10;
+        }
+        
+        .pdf-page-canvas {
+            display: block;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            background: white;
+        }
+        
+        /* 进度条样式 */
+        .progress-bar-container {
+            position: sticky;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+            margin-bottom: 15px;
+            z-index: 100;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+        }
+        
+        .progress-info {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 101;
+            pointer-events: none;
+        }
+        
+        /* 美化按钮 */
+        .viewer-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .viewer-controls .btn {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .viewer-controls .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .viewer-controls .btn:active {
+            transform: translateY(0);
+        }
+        
+        .viewer-controls .page-info {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+        }
+        
+        .viewer-controls input[type="number"] {
+            width: 70px;
+            padding: 10px;
+            border: 2px solid white;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+            background: white;
+            color: #667eea;
+        }
+        
+        .viewer-controls input[type="number"]:focus {
+            outline: none;
+            border-color: #764ba2;
+            box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.2);
+        }
+        
+        /* 控制按钮分组 */
+        .control-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            background: rgba(255,255,255,0.1);
+            padding: 5px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>PDF 在线预览</h1>
+            <div class="privacy-notice">
+                🔒 所有处理均在本地完成，不上传到服务器
+            </div>
+        </div>
+
+        <!-- 上传区域 -->
+        <div class="card" id="upload-section">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">📄</div>
+                <h3>点击或拖拽上传 PDF 文件</h3>
+                <p>支持最大 50MB 的 PDF 文件</p>
+            </div>
+        </div>
+
+        <!-- 预览区域 -->
+        <div class="card" id="preview-section" style="display: none;">
+            <div class="pdf-viewer-wrapper">
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="scroll-progress"></div>
+                </div>
+                <div class="progress-info" id="progress-info">0%</div>
+                <div class="pdf-viewer" id="pdf-viewer"></div>
+            </div>
+            
+            <div class="viewer-controls">
+                <div class="control-group">
+                    <button class="btn" id="prev-page">⬅️ 上一页</button>
+                    <span class="page-info" id="page-info">第 1 页 / 共 1 页</span>
+                    <button class="btn" id="next-page">下一页 ➡️</button>
+                </div>
+                
+                <div class="control-group">
+                    <input type="number" id="page-input" min="1" value="1">
+                    <button class="btn" id="go-to-page">🎯 跳转</button>
+                </div>
+                
+                <div class="control-group">
+                    <button class="btn" id="zoom-out">🔍➖ 缩小</button>
+                    <button class="btn" id="zoom-in">🔍➕ 放大</button>
+                    <button class="btn" id="fit-page">📐 适应</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 进度指示器 -->
+    <div class="progress-overlay" id="progress-overlay">
+        <div class="progress-content">
+            <div class="progress-spinner"></div>
+            <p class="progress-message">加载中...</p>
+        </div>
+    </div>
+
+    <script>
+        // PDF 预览工具类
+        class PDFPreviewTool {
+            constructor() {
+                this.uploader = new FileUploader({ multiple: false });
+                this.progress = new ProgressIndicator();
+                
+                this._initElements();
+                this._bindEvents();
+            }
+
+            _initElements() {
+                this.uploadArea = document.getElementById('upload-area');
+                this.uploadSection = document.getElementById('upload-section');
+                this.previewSection = document.getElementById('preview-section');
+                this.viewerContainer = document.getElementById('pdf-viewer');
+                this.pageInfo = document.getElementById('page-info');
+                this.pageInput = document.getElementById('page-input');
+                this.scrollProgress = document.getElementById('scroll-progress');
+                this.progressInfo = document.getElementById('progress-info');
+                this.pdfDoc = null;
+                this.currentPage = 1;
+            }
+
+            _bindEvents() {
+                // 点击上传
+                this.uploadArea.addEventListener('click', () => {
+                    this.uploader.selectFiles().then(files => {
+                        this.handleFileUpload(files[0]);
+                    }).catch(err => {
+                        if (err.message !== '没有有效的文件') {
+                            Utils.showError(err.message);
+                        }
+                    });
+                });
+
+                // 拖拽上传
+                this.uploader.setupDropZone(this.uploadArea, (files) => {
+                    this.handleFileUpload(files[0]);
+                });
+
+                // 滚动进度条
+                this.viewerContainer.addEventListener('scroll', () => {
+                    this._updateScrollProgress();
+                });
+
+                // 页面导航
+                document.getElementById('prev-page').addEventListener('click', () => {
+                    this._scrollToPreviousPage();
+                });
+
+                document.getElementById('next-page').addEventListener('click', () => {
+                    this._scrollToNextPage();
+                });
+
+                document.getElementById('go-to-page').addEventListener('click', () => {
+                    const pageNum = parseInt(this.pageInput.value);
+                    if (this.pdfDoc && pageNum >= 1 && pageNum <= this.pdfDoc.numPages) {
+                        this._scrollToPage(pageNum);
+                    }
+                });
+
+                // 回车跳转
+                this.pageInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        document.getElementById('go-to-page').click();
+                    }
+                });
+
+                // 缩放控制 - 暂时禁用，因为现在显示所有页面
+                document.getElementById('zoom-in').addEventListener('click', () => {
+                    Utils.showError('缩放功能暂不支持多页预览模式');
+                });
+
+                document.getElementById('zoom-out').addEventListener('click', () => {
+                    Utils.showError('缩放功能暂不支持多页预览模式');
+                });
+
+                document.getElementById('fit-page').addEventListener('click', () => {
+                    Utils.showError('缩放功能暂不支持多页预览模式');
+                });
+            }
+
+            async handleFileUpload(file) {
+                try {
+                    this.progress.show('加载 PDF 文件...');
+
+                    // 读取文件
+                    const arrayBuffer = await this.uploader.readAsArrayBuffer(file);
+
+                    // 清空容器
+                    this.viewerContainer.innerHTML = '';
+
+                    // 配置 PDF.js
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 
+                        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+                    // 加载 PDF
+                    const loadingTask = pdfjsLib.getDocument({ 
+                        data: arrayBuffer,
+                        disableAutoFetch: true,
+                        disableStream: true
+                    });
+                    this.pdfDoc = await loadingTask.promise;
+
+                    // 渲染所有页面
+                    for (let pageNum = 1; pageNum <= this.pdfDoc.numPages; pageNum++) {
+                        this.progress.show(`加载第 ${pageNum}/${this.pdfDoc.numPages} 页...`);
+                        await this._renderPage(pageNum);
+                    }
+
+                    // 显示预览区域
+                    this.uploadSection.style.display = 'none';
+                    this.previewSection.style.display = 'block';
+
+                    // 更新页面信息
+                    this.currentPage = 1;
+                    this._updatePageInfo();
+                    
+                    // 初始化滚动进度
+                    this._initScrollProgress();
+
+                    this.progress.hide();
+                    Utils.showSuccess(`PDF 加载成功！共 ${this.pdfDoc.numPages} 页`);
+
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError(error.message || 'PDF 文件加载失败，请重试');
+                    console.error('PDF 加载错误:', error);
+                }
+            }
+
+            async _renderPage(pageNum) {
+                const page = await this.pdfDoc.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 1.5 });
+
+                // 创建页面包装器
+                const pageWrapper = document.createElement('div');
+                pageWrapper.className = 'page-wrapper';
+                pageWrapper.dataset.pageNum = pageNum;
+
+                // 创建页码标签
+                const pageLabel = document.createElement('div');
+                pageLabel.className = 'page-number';
+                pageLabel.textContent = `第 ${pageNum} 页`;
+                pageWrapper.appendChild(pageLabel);
+
+                // 创建 canvas
+                const canvas = document.createElement('canvas');
+                canvas.className = 'pdf-page-canvas';
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+
+                const ctx = canvas.getContext('2d');
+
+                // 渲染 PDF 页面
+                await page.render({ canvasContext: ctx, viewport }).promise;
+
+                pageWrapper.appendChild(canvas);
+                this.viewerContainer.appendChild(pageWrapper);
+            }
+
+            _updatePageInfo() {
+                if (this.pdfDoc) {
+                    const total = this.pdfDoc.numPages;
+                    this.pageInfo.textContent = `第 ${this.currentPage} 页 / 共 ${total} 页`;
+                    this.pageInput.value = this.currentPage;
+                    this.pageInput.max = total;
+                }
+            }
+
+            _updateScrollProgress() {
+                const container = this.viewerContainer;
+                const scrollTop = container.scrollTop;
+                const scrollHeight = container.scrollHeight - container.clientHeight;
+                
+                if (scrollHeight > 0) {
+                    const progress = (scrollTop / scrollHeight) * 100;
+                    this.scrollProgress.style.width = progress + '%';
+                    this.progressInfo.textContent = Math.round(progress) + '%';
+                    
+                    // 根据滚动位置更新当前页码
+                    this._updateCurrentPageByScroll();
+                } else {
+                    this.scrollProgress.style.width = '0%';
+                    this.progressInfo.textContent = '0%';
+                }
+            }
+            
+            _updateCurrentPageByScroll() {
+                const container = this.viewerContainer;
+                const scrollTop = container.scrollTop;
+                const pageWrappers = container.querySelectorAll('.page-wrapper');
+                
+                for (let i = 0; i < pageWrappers.length; i++) {
+                    const wrapper = pageWrappers[i];
+                    const rect = wrapper.getBoundingClientRect();
+                    const containerRect = container.getBoundingClientRect();
+                    
+                    // 如果页面在视口中
+                    if (rect.top <= containerRect.top + 100 && rect.bottom >= containerRect.top + 100) {
+                        this.currentPage = parseInt(wrapper.dataset.pageNum);
+                        this._updatePageInfo();
+                        break;
+                    }
+                }
+            }
+            
+            _initScrollProgress() {
+                // 初始化进度条
+                this._updateScrollProgress();
+            }
+
+            _scrollToPage(pageNum) {
+                const pageWrapper = this.viewerContainer.querySelector(`[data-page-num="${pageNum}"]`);
+                if (pageWrapper) {
+                    pageWrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    this.currentPage = pageNum;
+                    this._updatePageInfo();
+                }
+            }
+
+            _scrollToPreviousPage() {
+                if (this.currentPage > 1) {
+                    this._scrollToPage(this.currentPage - 1);
+                }
+            }
+
+            _scrollToNextPage() {
+                if (this.pdfDoc && this.currentPage < this.pdfDoc.numPages) {
+                    this._scrollToPage(this.currentPage + 1);
+                }
+            }
+        }
+
+        // 初始化工具
+        document.addEventListener('DOMContentLoaded', () => {
+            new PDFPreviewTool();
+        });
+    </script>
+</body>
+</html>

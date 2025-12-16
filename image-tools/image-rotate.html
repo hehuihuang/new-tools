@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>旋转翻转 - 图片工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>图片旋转与翻转</h1>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card" id="upload-section">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">🖼️</div>
+                <h3>点击或拖拽上传图片</h3>
+            </div>
+        </div>
+
+        <div class="card" id="process-section" style="display: none;">
+            <div class="image-viewer">
+                <canvas id="preview-canvas"></canvas>
+            </div>
+            
+            <div class="viewer-controls">
+                <button class="btn btn-primary" id="rotate-left-btn">↶ 左旋转90°</button>
+                <button class="btn btn-primary" id="rotate-right-btn">↷ 右旋转90°</button>
+                <button class="btn btn-secondary" id="flip-h-btn">↔ 水平翻转</button>
+                <button class="btn btn-secondary" id="flip-v-btn">↕ 垂直翻转</button>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="btn btn-secondary" id="download-btn">下载图片</button>
+                <button class="btn" id="reset-btn" style="margin-left: 10px;">重新上传</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ImageRotateTool {
+            constructor() {
+                this.uploader = new ImageUploader({ multiple: false });
+                this.progress = new ProgressIndicator();
+                this.currentCanvas = null;
+                
+                this._initElements();
+                this._bindEvents();
+            }
+
+            _initElements() {
+                this.uploadArea = document.getElementById('upload-area');
+                this.uploadSection = document.getElementById('upload-section');
+                this.processSection = document.getElementById('process-section');
+                this.previewCanvas = document.getElementById('preview-canvas');
+            }
+
+            _bindEvents() {
+                this.uploadArea.addEventListener('click', () => {
+                    this.uploader.selectFiles().then(files => this.loadImage(files[0])).catch(err => {});
+                });
+
+                this.uploader.setupDropZone(this.uploadArea, (files) => this.loadImage(files[0]));
+
+                document.getElementById('rotate-left-btn').addEventListener('click', () => this.rotate(-90));
+                document.getElementById('rotate-right-btn').addEventListener('click', () => this.rotate(90));
+                document.getElementById('flip-h-btn').addEventListener('click', () => this.flip(true, false));
+                document.getElementById('flip-v-btn').addEventListener('click', () => this.flip(false, true));
+                document.getElementById('download-btn').addEventListener('click', () => this.downloadImage());
+                document.getElementById('reset-btn').addEventListener('click', () => this.reset());
+            }
+
+            async loadImage(file) {
+                try {
+                    this.progress.show('加载图片...');
+                    
+                    this.originalFile = file;
+                    const dataURL = await this.uploader.readAsDataURL(file);
+                    
+                    this.currentCanvas = document.createElement('canvas');
+                    await Utils.loadImageToCanvas(dataURL, this.currentCanvas);
+                    
+                    this.updatePreview();
+                    
+                    this.uploadSection.style.display = 'none';
+                    this.processSection.style.display = 'block';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('图片加载成功！');
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('图片加载失败: ' + error.message);
+                }
+            }
+
+            rotate(degrees) {
+                const rotated = Utils.rotateCanvas(this.currentCanvas, degrees);
+                this.currentCanvas = rotated;
+                this.updatePreview();
+                Utils.showSuccess(`已旋转 ${degrees}°`);
+            }
+
+            flip(horizontal, vertical) {
+                const flipped = Utils.flipCanvas(this.currentCanvas, horizontal, vertical);
+                this.currentCanvas = flipped;
+                this.updatePreview();
+                Utils.showSuccess(`已${horizontal ? '水平' : '垂直'}翻转`);
+            }
+
+            updatePreview() {
+                this.previewCanvas.width = this.currentCanvas.width;
+                this.previewCanvas.height = this.currentCanvas.height;
+                const ctx = this.previewCanvas.getContext('2d');
+                ctx.drawImage(this.currentCanvas, 0, 0);
+            }
+
+            async downloadImage() {
+                try {
+                    const blob = await Utils.canvasToBlob(this.currentCanvas, 'image/png');
+                    const fileName = this.originalFile.name.replace(/\.[^/.]+$/, '') + '-transformed.png';
+                    Utils.downloadFile(blob, fileName);
+                    Utils.showSuccess('下载成功！');
+                } catch (error) {
+                    Utils.showError('下载失败: ' + error.message);
+                }
+            }
+
+            reset() {
+                this.uploadSection.style.display = 'block';
+                this.processSection.style.display = 'none';
+                this.currentCanvas = null;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new ImageRotateTool();
+        });
+    </script>
+</body>
+</html>

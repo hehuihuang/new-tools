@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片压缩 - 图片工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>图片压缩</h1>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card" id="upload-section">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">🖼️</div>
+                <h3>点击或拖拽上传图片</h3>
+                <p style="color: #666; font-size: 14px; margin-top: 10px;">支持 JPG、PNG、WEBP、BMP 格式</p>
+            </div>
+        </div>
+
+        <div class="card" id="process-section" style="display: none;">
+            <h3>文件信息</h3>
+            <p id="file-info" style="margin-bottom: 20px; color: #666;"></p>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span>压缩质量</span>
+                    <span id="quality-value">80%</span>
+                </div>
+                <input type="range" id="quality-slider" class="slider" min="10" max="100" value="80">
+                <p style="font-size: 12px; color: #999; margin-top: 5px;">
+                    质量越低，文件越小，但图片清晰度会降低
+                </p>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button class="btn btn-primary" id="compress-btn">压缩图片</button>
+                <button class="btn btn-secondary" id="reset-btn" style="margin-left: 10px;">重新上传</button>
+            </div>
+
+            <div id="result-section" style="display: none; margin-top: 30px;">
+                <h3>压缩结果</h3>
+                <div class="comparison-view">
+                    <div class="comparison-item">
+                        <h4>原始图片</h4>
+                        <canvas id="original-canvas"></canvas>
+                        <div class="info" id="original-info"></div>
+                    </div>
+                    <div class="comparison-item">
+                        <h4>压缩后</h4>
+                        <canvas id="compressed-canvas"></canvas>
+                        <div class="info" id="compressed-info"></div>
+                    </div>
+                </div>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="btn btn-secondary" id="download-btn">下载压缩图片</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ImageCompressTool {
+            constructor() {
+                this.uploader = new ImageUploader({ multiple: false });
+                this.progress = new ProgressIndicator();
+                this.originalFile = null;
+                this.originalCanvas = null;
+                this.compressedBlob = null;
+                
+                this._initElements();
+                this._bindEvents();
+            }
+
+            _initElements() {
+                this.uploadArea = document.getElementById('upload-area');
+                this.uploadSection = document.getElementById('upload-section');
+                this.processSection = document.getElementById('process-section');
+                this.fileInfo = document.getElementById('file-info');
+                this.qualitySlider = document.getElementById('quality-slider');
+                this.qualityValue = document.getElementById('quality-value');
+                this.resultSection = document.getElementById('result-section');
+                this.originalCanvasEl = document.getElementById('original-canvas');
+                this.compressedCanvasEl = document.getElementById('compressed-canvas');
+            }
+
+            _bindEvents() {
+                // 上传区域点击
+                this.uploadArea.addEventListener('click', () => {
+                    this.uploader.selectFiles().then(files => {
+                        this.loadImage(files[0]);
+                    }).catch(err => {});
+                });
+
+                // 拖拽上传
+                this.uploader.setupDropZone(this.uploadArea, (files) => {
+                    this.loadImage(files[0]);
+                });
+
+                // 质量滑块
+                this.qualitySlider.addEventListener('input', (e) => {
+                    this.qualityValue.textContent = e.target.value + '%';
+                });
+
+                // 压缩按钮
+                document.getElementById('compress-btn').addEventListener('click', () => {
+                    this.compressImage();
+                });
+
+                // 重新上传按钮
+                document.getElementById('reset-btn').addEventListener('click', () => {
+                    this.reset();
+                });
+
+                // 下载按钮
+                document.getElementById('download-btn').addEventListener('click', () => {
+                    this.downloadImage();
+                });
+            }
+
+            async loadImage(file) {
+                try {
+                    this.progress.show('加载图片...');
+                    
+                    this.originalFile = file;
+                    const dataURL = await this.uploader.readAsDataURL(file);
+                    
+                    // 创建临时 canvas 加载图片
+                    const tempCanvas = document.createElement('canvas');
+                    const img = await Utils.loadImageToCanvas(dataURL, tempCanvas);
+                    this.originalCanvas = tempCanvas;
+                    
+                    // 显示文件信息
+                    this.fileInfo.textContent = `文件名: ${file.name} | 大小: ${Utils.formatFileSize(file.size)} | 尺寸: ${img.width} × ${img.height}`;
+                    
+                    // 显示原始图片预览
+                    this.originalCanvasEl.width = img.width;
+                    this.originalCanvasEl.height = img.height;
+                    const ctx = this.originalCanvasEl.getContext('2d');
+                    ctx.drawImage(tempCanvas, 0, 0);
+                    
+                    // 切换界面
+                    this.uploadSection.style.display = 'none';
+                    this.processSection.style.display = 'block';
+                    this.resultSection.style.display = 'none';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('图片加载成功！');
+                    
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('图片加载失败: ' + error.message);
+                }
+            }
+
+            async compressImage() {
+                try {
+                    this.progress.show('压缩图片...');
+                    
+                    const quality = parseInt(this.qualitySlider.value) / 100;
+                    
+                    // 压缩图片
+                    this.compressedBlob = await Utils.canvasToBlob(
+                        this.originalCanvas,
+                        'image/jpeg',
+                        quality
+                    );
+                    
+                    // 显示压缩后的图片
+                    const compressedURL = URL.createObjectURL(this.compressedBlob);
+                    const img = await Utils.loadImageToCanvas(compressedURL, this.compressedCanvasEl);
+                    
+                    // 显示信息
+                    const originalSize = this.originalFile.size;
+                    const compressedSize = this.compressedBlob.size;
+                    const ratio = ((originalSize - compressedSize) / originalSize * 100).toFixed(1);
+                    
+                    document.getElementById('original-info').textContent = 
+                        `大小: ${Utils.formatFileSize(originalSize)}`;
+                    document.getElementById('compressed-info').textContent = 
+                        `大小: ${Utils.formatFileSize(compressedSize)} (减少 ${ratio}%)`;
+                    
+                    this.resultSection.style.display = 'block';
+                    
+                    // 清理临时 URL
+                    URL.revokeObjectURL(compressedURL);
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('图片压缩完成！');
+                    
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('图片压缩失败: ' + error.message);
+                }
+            }
+
+            downloadImage() {
+                if (this.compressedBlob) {
+                    const fileName = this.originalFile.name.replace(/\.[^/.]+$/, '') + '-compressed.jpg';
+                    Utils.downloadFile(this.compressedBlob, fileName);
+                    Utils.showSuccess('下载成功！');
+                }
+            }
+
+            reset() {
+                this.uploadSection.style.display = 'block';
+                this.processSection.style.display = 'none';
+                this.resultSection.style.display = 'none';
+                this.originalFile = null;
+                this.originalCanvas = null;
+                this.compressedBlob = null;
+                this.qualitySlider.value = 80;
+                this.qualityValue.textContent = '80%';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new ImageCompressTool();
+        });
+    </script>
+</body>
+</html>

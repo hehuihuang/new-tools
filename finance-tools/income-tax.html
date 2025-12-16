@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>综合所得年度汇算计算器 - 财税工具</title>
+  <link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+  <div class="container">
+    <div id="header"></div>
+
+    <div class="card">
+      <h3 class="card-title">收入信息</h3>
+      
+      <div id="salary-income-input"></div>
+      <div id="labor-income-input"></div>
+      <div id="royalty-income-input"></div>
+      <div id="franchise-income-input"></div>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title">扣除信息</h3>
+      
+      <div id="special-input"></div>
+      <div id="additional-input"></div>
+      <div id="other-input"></div>
+      <div id="prepaid-input"></div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="calculate()">计算</button>
+        <button class="btn btn-secondary" onclick="clearForm()">清空</button>
+      </div>
+    </div>
+
+    <div id="result-container" style="display: none;">
+      <div id="result-card"></div>
+      <div id="details-card"></div>
+    </div>
+  </div>
+
+  <script src="shared/components.js"></script>
+  <script src="shared/utils.js"></script>
+  <script src="shared/calculators.js"></script>
+  <script>
+    document.getElementById('header').innerHTML = createFinanceHeader(
+      '综合所得年度汇算计算器',
+      '计算年度综合所得个人所得税，确定应补税额或应退税额'
+    );
+
+    document.getElementById('salary-income-input').innerHTML = createInputGroup({
+      label: '工资薪金所得',
+      id: 'salaryIncome',
+      type: 'number',
+      placeholder: '全年工资薪金收入',
+      required: true,
+      min: 0,
+      step: '0.01',
+      unit: '元'
+    });
+
+    document.getElementById('labor-income-input').innerHTML = createInputGroup({
+      label: '劳务报酬所得',
+      id: 'laborIncome',
+      type: 'number',
+      placeholder: '全年劳务报酬收入',
+      min: 0,
+      step: '0.01',
+      unit: '元',
+      value: '0',
+      hint: '收入额 = 收入 × 80%'
+    });
+
+    document.getElementById('royalty-income-input').innerHTML = createInputGroup({
+      label: '稿酬所得',
+      id: 'royaltyIncome',
+      type: 'number',
+      placeholder: '全年稿酬收入',
+      min: 0,
+      step: '0.01',
+      unit: '元',
+      value: '0',
+      hint: '收入额 = 收入 × 80% × 70%'
+    });
+
+    document.getElementById('franchise-income-input').innerHTML = createInputGroup({
+      label: '特许权使用费所得',
+      id: 'franchiseIncome',
+      type: 'number',
+      placeholder: '全年特许权使用费收入',
+      min: 0,
+      step: '0.01',
+      unit: '元',
+      value: '0',
+      hint: '收入额 = 收入 × 80%'
+    });
+
+    document.getElementById('special-input').innerHTML = createInputGroup({
+      label: '专项扣除（五险一金）',
+      id: 'special',
+      type: 'number',
+      placeholder: '全年五险一金总额',
+      min: 0,
+      step: '0.01',
+      unit: '元',
+      value: '0'
+    });
+
+    document.getElementById('additional-input').innerHTML = createInputGroup({
+      label: '专项附加扣除',
+      id: 'additional',
+      type: 'number',
+      placeholder: '子女教育、住房贷款等',
+      min: 0,
+      step: '100',
+      unit: '元',
+      value: '0'
+    });
+
+    document.getElementById('other-input').innerHTML = createInputGroup({
+      label: '其他扣除',
+      id: 'other',
+      type: 'number',
+      placeholder: '企业年金、商业健康保险等',
+      min: 0,
+      step: '0.01',
+      unit: '元',
+      value: '0'
+    });
+
+    document.getElementById('prepaid-input').innerHTML = createInputGroup({
+      label: '已预缴税额',
+      id: 'prepaid',
+      type: 'number',
+      placeholder: '全年已预缴的个人所得税',
+      min: 0,
+      step: '0.01',
+      unit: '元',
+      value: '0'
+    });
+
+    function calculate() {
+      clearAllInputErrors();
+      
+      const salaryIncome = document.getElementById('salaryIncome').value;
+      const laborIncome = document.getElementById('laborIncome').value || 0;
+      const royaltyIncome = document.getElementById('royaltyIncome').value || 0;
+      const franchiseIncome = document.getElementById('franchiseIncome').value || 0;
+      const special = document.getElementById('special').value || 0;
+      const additional = document.getElementById('additional').value || 0;
+      const other = document.getElementById('other').value || 0;
+      const prepaid = document.getElementById('prepaid').value || 0;
+
+      const salaryValidation = validateNumber(salaryIncome, 0);
+      if (!salaryValidation.valid) {
+        showInputError('salaryIncome', salaryValidation.error);
+        return;
+      }
+
+      // 计算综合所得
+      const totalIncome = salaryValidation.value + 
+                         Number(laborIncome) * 0.8 + 
+                         Number(royaltyIncome) * 0.8 * 0.7 + 
+                         Number(franchiseIncome) * 0.8;
+
+      const result = calculateIndividualTax(totalIncome, {
+        basic: ANNUAL_BASIC_DEDUCTION,
+        special: Number(special),
+        additional: Number(additional),
+        other: Number(other)
+      }, true);
+
+      // 计算应补退税额
+      const refundOrPayable = round2(result.tax - Number(prepaid));
+
+      displayResults(result, totalIncome, refundOrPayable);
+      saveToHistory('income-tax', { 
+        salaryIncome: salaryValidation.value, 
+        laborIncome, 
+        royaltyIncome, 
+        franchiseIncome,
+        special,
+        additional,
+        other,
+        prepaid,
+        result 
+      });
+    }
+
+    function displayResults(result, totalIncome, refundOrPayable) {
+      const isRefund = refundOrPayable < 0;
+      const refundLabel = isRefund ? '应退税额' : '应补税额';
+      const refundValue = Math.abs(refundOrPayable);
+
+      const resultData = {
+        totalIncome: {
+          label: '综合所得总额',
+          value: formatCurrency(totalIncome) + ' 元'
+        },
+        taxableIncome: {
+          label: '应纳税所得额',
+          value: formatCurrency(result.taxableIncome) + ' 元'
+        },
+        tax: {
+          label: '应纳税额',
+          value: formatCurrency(result.tax) + ' 元',
+          sub: `税率${formatPercent(result.rate)}`
+        },
+        refund: {
+          label: refundLabel,
+          value: formatCurrency(refundValue) + ' 元',
+          highlight: true,
+          sub: isRefund ? '✓ 可以申请退税' : '需要补缴税款'
+        }
+      };
+
+      document.getElementById('result-card').innerHTML = createResultCard('计算结果', resultData);
+
+      const detailsHTML = createDetailsList(result.steps.map(step => ({
+        label: step.label,
+        value: typeof step.value === 'number' ? formatCurrency(step.value) : step.value,
+        formula: step.formula
+      })));
+
+      document.getElementById('details-card').innerHTML = createCollapsible(
+        '详细计算过程',
+        `<div class="card">${detailsHTML}</div>`,
+        false
+      );
+
+      document.getElementById('result-container').style.display = 'block';
+      showMessage('success', '计算完成');
+    }
+
+    function clearForm() {
+      document.getElementById('salaryIncome').value = '';
+      document.getElementById('laborIncome').value = '0';
+      document.getElementById('royaltyIncome').value = '0';
+      document.getElementById('franchiseIncome').value = '0';
+      document.getElementById('special').value = '0';
+      document.getElementById('additional').value = '0';
+      document.getElementById('other').value = '0';
+      document.getElementById('prepaid').value = '0';
+      document.getElementById('result-container').style.display = 'none';
+      clearAllInputErrors();
+    }
+  </script>
+</body>
+</html>

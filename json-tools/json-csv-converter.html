@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON/CSV 转换 - JSON 工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>JSON ↔ CSV 转换</h1>
+            <p>在 JSON 和 CSV 格式之间互相转换，适用于数据分析和表格处理</p>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="json-to-csv">JSON → CSV</button>
+            <button class="tab" data-tab="csv-to-json">CSV → JSON</button>
+        </div>
+
+        <div class="tab-content active" id="json-to-csv">
+            <div class="card">
+                <div class="editor-container">
+                    <label class="editor-label">输入 JSON 数组数据</label>
+                    <textarea id="json-input" class="editor" placeholder='在此输入 JSON 数组，例如：[{"name":"张三","age":25},{"name":"李四","age":30}]'></textarea>
+                </div>
+
+                <div class="input-group">
+                    <label>
+                        <input type="checkbox" id="flatten-nested" checked>
+                        扁平化嵌套对象
+                    </label>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="json-to-csv-btn">转换为 CSV</button>
+                    <button class="btn btn-secondary" id="upload-json-btn">上传 JSON 文件</button>
+                </div>
+            </div>
+
+            <div class="card" id="csv-output-section" style="display: none;">
+                <div class="editor-container">
+                    <label class="editor-label">CSV 输出</label>
+                    <textarea id="csv-output" class="editor" readonly></textarea>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-secondary" id="copy-csv-btn">复制</button>
+                    <button class="btn btn-secondary" id="download-csv-btn">下载 CSV</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="csv-to-json">
+            <div class="card">
+                <div class="editor-container">
+                    <label class="editor-label">输入 CSV 数据</label>
+                    <textarea id="csv-input" class="editor" placeholder="在此输入 CSV 数据，第一行为表头"></textarea>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="csv-to-json-btn">转换为 JSON</button>
+                    <button class="btn btn-secondary" id="upload-csv-btn">上传 CSV 文件</button>
+                </div>
+            </div>
+
+            <div class="card" id="json-output-section" style="display: none;">
+                <div class="editor-container">
+                    <label class="editor-label">JSON 输出</label>
+                    <textarea id="json-output" class="editor" readonly></textarea>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-secondary" id="copy-json-btn">复制</button>
+                    <button class="btn btn-secondary" id="download-json-btn">下载 JSON</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+    <script>
+        class JSONCSVConverterTool {
+            constructor() {
+                this.fileHandler = new FileHandler();
+                this._initElements();
+                this._bindEvents();
+            }
+
+            _initElements() {
+                this.jsonInput = document.getElementById('json-input');
+                this.csvInput = document.getElementById('csv-input');
+                this.csvOutput = document.getElementById('csv-output');
+                this.jsonOutput = document.getElementById('json-output');
+                this.flattenNested = document.getElementById('flatten-nested');
+                this.csvOutputSection = document.getElementById('csv-output-section');
+                this.jsonOutputSection = document.getElementById('json-output-section');
+            }
+
+            _bindEvents() {
+                // 选项卡切换
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        this.switchTab(e.target.dataset.tab);
+                    });
+                });
+
+                // JSON 转 CSV
+                document.getElementById('json-to-csv-btn').addEventListener('click', () => {
+                    this.jsonToCSV();
+                });
+
+                // CSV 转 JSON
+                document.getElementById('csv-to-json-btn').addEventListener('click', () => {
+                    this.csvToJSON();
+                });
+
+                // 上传按钮
+                document.getElementById('upload-json-btn').addEventListener('click', async () => {
+                    await this.uploadFile(this.jsonInput, ['.json', '.txt']);
+                });
+
+                document.getElementById('upload-csv-btn').addEventListener('click', async () => {
+                    await this.uploadFile(this.csvInput, ['.csv', '.txt']);
+                });
+
+                // 复制按钮
+                document.getElementById('copy-csv-btn').addEventListener('click', async () => {
+                    await this.fileHandler.copyToClipboard(this.csvOutput.value);
+                });
+
+                document.getElementById('copy-json-btn').addEventListener('click', async () => {
+                    await this.fileHandler.copyToClipboard(this.jsonOutput.value);
+                });
+
+                // 下载按钮
+                document.getElementById('download-csv-btn').addEventListener('click', () => {
+                    this.downloadFile(this.csvOutput.value, 'converted.csv');
+                });
+
+                document.getElementById('download-json-btn').addEventListener('click', () => {
+                    this.downloadFile(this.jsonOutput.value, 'converted.json');
+                });
+            }
+
+            switchTab(tabId) {
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+
+                document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+                document.getElementById(tabId).classList.add('active');
+            }
+
+            jsonToCSV() {
+                const input = this.jsonInput.value.trim();
+                
+                if (!input) {
+                    Utils.showError('请输入 JSON 数组数据');
+                    return;
+                }
+
+                try {
+                    Utils.showLoading('转换中...');
+                    const jsonArray = JSON.parse(input);
+                    
+                    if (!Array.isArray(jsonArray)) {
+                        throw new Error('输入必须是 JSON 数组');
+                    }
+
+                    const options = {
+                        flatten: this.flattenNested.checked
+                    };
+
+                    const csv = Utils.jsonToCSV(jsonArray, options);
+                    this.csvOutput.value = csv;
+                    this.csvOutputSection.style.display = 'block';
+                    this.jsonInput.classList.remove('error');
+                    Utils.hideLoading();
+                    Utils.showSuccess('转换成功');
+                } catch (error) {
+                    Utils.hideLoading();
+                    this.jsonInput.classList.add('error');
+                    Utils.showError('转换失败: ' + error.message);
+                    this.csvOutputSection.style.display = 'none';
+                }
+            }
+
+            csvToJSON() {
+                const input = this.csvInput.value.trim();
+                
+                if (!input) {
+                    Utils.showError('请输入 CSV 数据');
+                    return;
+                }
+
+                try {
+                    Utils.showLoading('转换中...');
+                    const jsonArray = Utils.csvToJSON(input);
+                    const json = JSON.stringify(jsonArray, null, 2);
+                    this.jsonOutput.value = json;
+                    this.jsonOutputSection.style.display = 'block';
+                    this.csvInput.classList.remove('error');
+                    Utils.hideLoading();
+                    Utils.showSuccess('转换成功');
+                } catch (error) {
+                    Utils.hideLoading();
+                    this.csvInput.classList.add('error');
+                    Utils.showError('转换失败: ' + error.message);
+                    this.jsonOutputSection.style.display = 'none';
+                }
+            }
+
+            async uploadFile(editor, acceptTypes) {
+                try {
+                    const file = await this.fileHandler.uploadFile(acceptTypes);
+                    const content = await this.fileHandler.readAsText(file);
+                    editor.value = content;
+                    Utils.showSuccess('文件上传成功');
+                } catch (error) {
+                    if (error.message !== '未选择文件') {
+                        Utils.showError('文件上传失败: ' + error.message);
+                    }
+                }
+            }
+
+            downloadFile(content, filename) {
+                if (!content) {
+                    Utils.showError('没有可下载的内容');
+                    return;
+                }
+                this.fileHandler.downloadFile(content, Utils.generateFilename(filename.split('.')[0], filename.split('.')[1]));
+                Utils.showSuccess('文件下载成功');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new JSONCSVConverterTool();
+        });
+    </script>
+</body>
+</html>

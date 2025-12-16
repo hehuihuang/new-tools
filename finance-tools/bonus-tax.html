@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>年终奖个税计算器 - 财税工具</title>
+  <link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+  <div class="container">
+    <div id="header"></div>
+
+    <div class="card">
+      <h3 class="card-title">输入信息</h3>
+      
+      <div id="bonus-input"></div>
+      <div id="annual-income-input"></div>
+      
+      <div class="options-group">
+        <div class="option-item">
+          <input type="radio" id="method-separate" name="method" value="separate" checked>
+          <label for="method-separate">单独计税</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" id="method-combined" name="method" value="combined">
+          <label for="method-combined">并入综合所得</label>
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="calculate()">计算</button>
+        <button class="btn btn-secondary" onclick="clearForm()">清空</button>
+      </div>
+    </div>
+
+    <div id="result-container" style="display: none;">
+      <div id="result-card"></div>
+      <div id="comparison-card"></div>
+      <div id="details-card"></div>
+    </div>
+  </div>
+
+  <script src="shared/components.js"></script>
+  <script src="shared/utils.js"></script>
+  <script src="shared/calculators.js"></script>
+  <script>
+    // 初始化页面
+    document.getElementById('header').innerHTML = createFinanceHeader(
+      '年终奖个税计算器',
+      '计算年终奖的个人所得税，对比单独计税和并入综合所得两种方式'
+    );
+
+    document.getElementById('bonus-input').innerHTML = createInputGroup({
+      label: '年终奖金额',
+      id: 'bonus',
+      type: 'number',
+      placeholder: '请输入年终奖金额',
+      required: true,
+      min: 0,
+      step: '0.01',
+      unit: '元'
+    });
+
+    document.getElementById('annual-income-input').innerHTML = createInputGroup({
+      label: '年度综合所得',
+      id: 'annualIncome',
+      type: 'number',
+      placeholder: '并入方式需要填写',
+      min: 0,
+      step: '0.01',
+      unit: '元',
+      hint: '仅在选择"并入综合所得"时需要填写'
+    });
+
+    // 加载上次输入
+    const lastInput = loadLastInput('bonus-tax');
+    if (lastInput) {
+      document.getElementById('bonus').value = lastInput.bonus || '';
+      document.getElementById('annualIncome').value = lastInput.annualIncome || '';
+      if (lastInput.method) {
+        document.getElementById(`method-${lastInput.method}`).checked = true;
+      }
+    }
+
+    // 计算函数
+    function calculate() {
+      clearAllInputErrors();
+      
+      const bonus = document.getElementById('bonus').value;
+      const annualIncome = document.getElementById('annualIncome').value;
+      const method = document.querySelector('input[name="method"]:checked').value;
+
+      // 验证输入
+      const bonusValidation = validateNumber(bonus, 0);
+      if (!bonusValidation.valid) {
+        showInputError('bonus', bonusValidation.error);
+        return;
+      }
+
+      if (method === 'combined') {
+        const incomeValidation = validateNumber(annualIncome, 0);
+        if (!incomeValidation.valid) {
+          showInputError('annualIncome', incomeValidation.error);
+          return;
+        }
+      }
+
+      // 保存输入
+      saveLastInput('bonus-tax', {
+        bonus: bonusValidation.value,
+        annualIncome: method === 'combined' ? Number(annualIncome) : 0,
+        method
+      });
+
+      // 计算
+      const result = calculateBonusTax(
+        bonusValidation.value,
+        method,
+        method === 'combined' ? Number(annualIncome) : 0
+      );
+
+      // 同时计算另一种方式用于对比
+      const otherMethod = method === 'separate' ? 'combined' : 'separate';
+      const otherResult = calculateBonusTax(
+        bonusValidation.value,
+        otherMethod,
+        method === 'combined' ? 0 : Number(annualIncome) || 0
+      );
+
+      // 显示结果
+      displayResults(result, otherResult);
+
+      // 保存历史
+      saveToHistory('bonus-tax', {
+        bonus: bonusValidation.value,
+        annualIncome: method === 'combined' ? Number(annualIncome) : 0,
+        method,
+        result
+      });
+    }
+
+    function displayResults(result, otherResult) {
+      // 显示主要结果
+      const resultData = {
+        tax: {
+          label: '应纳税额',
+          value: formatCurrency(result.tax) + ' 元',
+          highlight: true
+        },
+        afterTax: {
+          label: '税后收入',
+          value: formatCurrency(result.afterTax) + ' 元'
+        },
+        rate: {
+          label: '适用税率',
+          value: formatPercent(result.rate)
+        }
+      };
+
+      document.getElementById('result-card').innerHTML = createResultCard(
+        result.method === 'separate' ? '单独计税结果' : '并入综合所得结果',
+        resultData
+      );
+
+      // 显示对比
+      const headers = ['计税方式', '应纳税额', '税后收入', '推荐'];
+      const currentLabel = result.method === 'separate' ? '单独计税' : '并入综合所得';
+      const otherLabel = otherResult.method === 'separate' ? '单独计税' : '并入综合所得';
+      
+      const recommended = result.tax < otherResult.tax;
+      const rows = [
+        {
+          cells: [
+            currentLabel,
+            formatCurrency(result.tax) + ' 元',
+            formatCurrency(result.afterTax) + ' 元',
+            recommended ? '✓ 推荐' : ''
+          ],
+          recommended
+        },
+        {
+          cells: [
+            otherLabel,
+            formatCurrency(otherResult.tax) + ' 元',
+            formatCurrency(otherResult.afterTax) + ' 元',
+            !recommended ? '✓ 推荐' : ''
+          ],
+          recommended: !recommended
+        }
+      ];
+
+      document.getElementById('comparison-card').innerHTML = `
+        <div class="card">
+          <h3 class="card-title">两种方式对比</h3>
+          ${createComparisonTable(headers, rows)}
+          <p style="margin-top: 15px; color: var(--text-muted); font-size: 0.9rem;">
+            💡 建议选择税额较低的计税方式
+          </p>
+        </div>
+      `;
+
+      // 显示详细计算过程
+      const detailsHTML = createDetailsList(result.steps.map(step => ({
+        label: step.label,
+        value: typeof step.value === 'number' ? formatCurrency(step.value) : step.value,
+        formula: step.formula
+      })));
+
+      document.getElementById('details-card').innerHTML = createCollapsible(
+        '详细计算过程',
+        `<div class="card">${detailsHTML}</div>`,
+        false
+      );
+
+      document.getElementById('result-container').style.display = 'block';
+      showMessage('success', '计算完成');
+    }
+
+    function clearForm() {
+      document.getElementById('bonus').value = '';
+      document.getElementById('annualIncome').value = '';
+      document.getElementById('method-separate').checked = true;
+      document.getElementById('result-container').style.display = 'none';
+      clearAllInputErrors();
+    }
+  </script>
+</body>
+</html>

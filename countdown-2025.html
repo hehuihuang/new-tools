@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2025 倒计时 - 科技感未来</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Orbitron', 'Segoe UI', monospace;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 4s infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        .container {
+            text-align: center;
+            z-index: 10;
+            position: relative;
+            padding: 20px;
+        }
+
+        .title {
+            font-size: 3.5rem;
+            font-weight: 900;
+            background: linear-gradient(45deg, #00ffff, #ff00ff, #00ff00, #ffff00);
+            background-size: 400% 400%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradient 4s ease infinite;
+            margin-bottom: 20px;
+            text-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+        }
+
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .countdown-container {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            margin-bottom: 50px;
+            flex-wrap: wrap;
+        }
+
+        .time-unit {
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid rgba(0, 255, 255, 0.6);
+            border-radius: 15px;
+            padding: 20px;
+            min-width: 120px;
+            backdrop-filter: blur(10px);
+            box-shadow:
+                0 0 20px rgba(0, 255, 255, 0.3),
+                inset 0 0 20px rgba(0, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .time-unit::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, #00ffff, #ff00ff, #00ff00, #ffff00);
+            border-radius: 15px;
+            opacity: 0;
+            z-index: -1;
+            transition: opacity 0.3s ease;
+        }
+
+        .time-unit:hover::before {
+            opacity: 1;
+        }
+
+        .time-unit:hover {
+            transform: translateY(-5px);
+            border-color: transparent;
+        }
+
+        .time-value {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #00ffff;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .time-label {
+            font-size: 0.9rem;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            opacity: 0.8;
+        }
+
+        .message-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 30px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .message-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.1), transparent);
+            animation: scan 3s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .daily-message {
+            font-size: 1.3rem;
+            line-height: 1.8;
+            color: #ffffff;
+            font-style: italic;
+            position: relative;
+            z-index: 1;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            margin: 30px 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ffff, #ff00ff);
+            border-radius: 4px;
+            transition: width 1s ease;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+        }
+
+        .floating-particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(0, 255, 255, 0.8);
+            border-radius: 50%;
+            animation: float 20s infinite linear;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(100vh) translateX(0);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100vh) translateX(100px);
+                opacity: 0;
+            }
+        }
+
+        .date-info {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 20px;
+            letter-spacing: 1px;
+        }
+
+        @media (max-width: 768px) {
+            .title {
+                font-size: 2.5rem;
+            }
+
+            .countdown-container {
+                gap: 15px;
+            }
+
+            .time-unit {
+                min-width: 100px;
+                padding: 15px;
+            }
+
+            .time-value {
+                font-size: 2.5rem;
+            }
+
+            .daily-message {
+                font-size: 1.1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="stars" id="stars"></div>
+    <div class="floating-particles" id="particles"></div>
+
+    <div class="container">
+        <h1 class="title">2025 倒计时</h1>
+
+        <div class="countdown-container">
+            <div class="time-unit">
+                <span class="time-value" id="days">0</span>
+                <span class="time-label">天</span>
+            </div>
+            <div class="time-unit">
+                <span class="time-value" id="hours">0</span>
+                <span class="time-label">小时</span>
+            </div>
+            <div class="time-unit">
+                <span class="time-value" id="minutes">0</span>
+                <span class="time-label">分钟</span>
+            </div>
+            <div class="time-unit">
+                <span class="time-value" id="seconds">0</span>
+                <span class="time-label">秒</span>
+            </div>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+
+        <div class="message-container">
+            <p class="daily-message" id="dailyMessage">加载中...</p>
+        </div>
+
+        <div class="date-info" id="dateInfo"></div>
+    </div>
+
+    <script>
+        // 60多条充满激情和哲理的话语
+        const motivationalQuotes = [
+            "时间是最公平的裁判，每个人都只有24小时，但不是每个人都懂得珍惜。",
+            "今天的努力，是明天的底气；今天的坚持，是明天的奇迹。",
+            "在时间的河流中，我们都是追梦人，勇敢地向着2025年的终点冲刺。",
+            "每一天都是新的开始，每一刻都充满无限可能。",
+            "成功路上并不拥挤，因为坚持的人不多。",
+            "时间不语，却回答了所有问题；岁月不言，却见证了所有真心。",
+            "2025年的每一秒都在倒数，但你的梦想在正计时。",
+            "不要等待机会，而要创造机会；不要追逐时间，而要超越时间。",
+            "生命中最美好的事物，都是值得等待的。",
+            "时间是最好的过滤器，最终会留下最珍贵的回忆。",
+            "每一个不曾起舞的日子，都是对生命的辜负。",
+            "2025年即将结束，但你的故事才刚刚开始。",
+            "时间就像海绵里的水，只要愿挤，总还是有的。",
+            "不要让昨天的遗憾，影响今天的精彩。",
+            "每一分每一秒都是独一无二的礼物，好好珍惜。",
+            "成功不是终点，失败也不是终结，唯有勇气才是永恒。",
+            "时间会证明一切，也会治愈一切。",
+            "在2025年的最后时光里，让我们创造无悔的青春。",
+            "生命的意义不在于长短，而在于是否精彩。",
+            "今天的你，是明天你回忆的主角。",
+            "时间是最宝贵的财富，投资它就是投资未来。",
+            "每一天都是限量版，过期不候。",
+            "不要害怕时间流逝，要害怕虚度光阴。",
+            "2025年的倒计时，也是你新征程的序曲。",
+            "时间会告诉我们，简单的喜欢最长远，平凡的陪伴最心安。",
+            "每一刻都是新的开始，每一次呼吸都充满希望。",
+            "在时间的长河中，我们要做最闪亮的星。",
+            "时间不等人，但等有心人。",
+            "今天的汗水，是明天的笑容；今天的坚持，是明天的收获。",
+            "2025年的每一天，都是成长路上的里程碑。",
+            "时间是最伟大的魔术师，能将不可能变成可能。",
+            "不要让时间成为借口，要让时间成为见证。",
+            "每一秒都在创造历史，每一刻都在书写传奇。",
+            "时间会给你答案，只要你耐心等待。",
+            "在2025年的尾声中，让我们绽放最美的光芒。",
+            "成功的秘诀在于坚持，奇迹的发生在于努力。",
+            "时间不会停止，但回忆会永存。",
+            "每一天都是上帝的礼物，要好好包装。",
+            "2025年的倒计时提醒我们：珍惜当下，创造未来。",
+            "时间是最公正的法官，它会给出最公正的判决。",
+            "不要让时间流逝了梦想，要让时间见证梦想。",
+            "每一刻都是新的机遇，每一步都是新的进步。",
+            "在时间的舞台上，每个人都是主角。",
+            "2025年的结束不是终点，而是新的起点。",
+            "时间会治愈一切，也会成就一切。",
+            "今天的努力，是为了明天的从容。",
+            "每一秒都值得期待，每一天都值得珍惜。",
+            "时间不语，却给了我们所有答案。",
+            "在2025年的最后时光里，让我们活出最好的自己。",
+            "成功需要时间，更需要坚持。",
+            "时间是最宝贵的资源，不要浪费在无意义的事情上。",
+            "每一刻都是独一无二的，无法复制，无法重来。",
+            "2025年的倒计时，也是梦想倒计时。",
+            "时间会证明，你的每一分努力都不会白费。",
+            "不要让时间成为遗憾，要让时间成为美好。",
+            "每一次倒计时，都是为了更好的开始。",
+            "在时间的长河中，要做那朵最绚烂的浪花。",
+            "2025年的每一天，希望您都在书写你的传奇故事。",
+            "时间是最好的老师，它教会我们成长。",
+            "今天的坚持，是明天的骄傲；今天的付出，是明天的回报。",
+            "每一秒都在倒数，但梦想在正数。"
+        ];
+
+        // 创建星空背景
+        function createStars() {
+            const starsContainer = document.getElementById('stars');
+            const starCount = 100;
+
+            for (let i = 0; i < starCount; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.animationDelay = Math.random() * 4 + 's';
+                star.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                starsContainer.appendChild(star);
+            }
+        }
+
+        // 创建漂浮粒子
+        function createParticles() {
+            const particlesContainer = document.getElementById('particles');
+            const particleCount = 20;
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 20 + 's';
+                particle.style.animationDuration = (Math.random() * 10 + 15) + 's';
+                particlesContainer.appendChild(particle);
+            }
+        }
+
+        // 计算倒计时
+        function updateCountdown() {
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const targetDate = new Date(currentYear, 11, 31, 23, 59, 59); // 2025年12月31日23:59:59
+
+            // 如果当前年份不是2025，设置为2025年
+            if (currentYear !== 2025) {
+                targetDate.setFullYear(2025);
+            }
+
+            const difference = targetDate - now;
+
+            if (difference <= 0) {
+                document.getElementById('days').textContent = '0';
+                document.getElementById('hours').textContent = '0';
+                document.getElementById('minutes').textContent = '0';
+                document.getElementById('seconds').textContent = '0';
+                document.getElementById('dailyMessage').textContent = '2025年已经结束，新的征程即将开始！';
+                return;
+            }
+
+            const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+            document.getElementById('days').textContent = days;
+            document.getElementById('hours').textContent = hours.toString().padStart(2, '0');
+            document.getElementById('minutes').textContent = minutes.toString().padStart(2, '0');
+            document.getElementById('seconds').textContent = seconds.toString().padStart(2, '0');
+
+            // 更新进度条
+            const yearStart = new Date(2025, 0, 1);
+            const yearEnd = new Date(2025, 11, 31, 23, 59, 59);
+            const totalYearTime = yearEnd - yearStart;
+            const elapsed = now - yearStart;
+            const progress = Math.min(100, (elapsed / totalYearTime) * 100);
+            document.getElementById('progressFill').style.width = progress + '%';
+        }
+
+        // 当前话语索引
+        let currentQuoteIndex = 0;
+
+        // 获取话语的三个规则函数
+        function getQuoteByDay() {
+            const now = new Date();
+            const yearStart = new Date(2025, 0, 1);
+            const dayOfYear = Math.floor((now - yearStart) / (1000 * 60 * 60 * 24));
+            return motivationalQuotes[dayOfYear % motivationalQuotes.length];
+        }
+
+        function getQuoteByHalfHour() {
+            const now = new Date();
+            const hours = now.getHours();
+            const minutes = now.getMinutes();
+            const halfHourIndex = hours * 2 + Math.floor(minutes / 30);
+            return motivationalQuotes[halfHourIndex % motivationalQuotes.length];
+        }
+
+        function getQuoteByClick() {
+            currentQuoteIndex = (currentQuoteIndex + 1) % motivationalQuotes.length;
+            return motivationalQuotes[currentQuoteIndex];
+        }
+
+        // 更新日期信息
+        function updateDateInfo() {
+            const now = new Date();
+            const options = {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'long'
+            };
+            const dateStr = now.toLocaleDateString('zh-CN', options);
+            document.getElementById('dateInfo').textContent = dateStr;
+        }
+
+        // 检查是否需要更新话语（每天凌晨更新）
+        function checkAndUpdateDailyMessage() {
+            const lastUpdate = localStorage.getItem('lastMessageUpdate');
+            const today = new Date().toDateString();
+
+            if (lastUpdate !== today) {
+                const message = getQuoteByDay();
+                document.getElementById('dailyMessage').textContent = message;
+                localStorage.setItem('lastMessageUpdate', today);
+                localStorage.setItem('currentMessage', message);
+                // 重置点击索引
+                currentQuoteIndex = 0;
+            } else {
+                const savedMessage = localStorage.getItem('currentMessage');
+                if (savedMessage) {
+                    document.getElementById('dailyMessage').textContent = savedMessage;
+                } else {
+                    const message = getQuoteByDay();
+                    document.getElementById('dailyMessage').textContent = message;
+                    localStorage.setItem('currentMessage', message);
+                }
+            }
+        }
+
+        // 检查是否需要按半小时更新话语
+        function checkAndUpdateHalfHourMessage() {
+            const now = new Date();
+            const minutes = now.getMinutes();
+            const currentHalfHour = Math.floor(minutes / 30);
+
+            const lastHalfHourUpdate = localStorage.getItem('lastHalfHourUpdate');
+            const today = now.toDateString();
+            const currentKey = `${today}_${currentHalfHour}`;
+
+            if (lastHalfHourUpdate !== currentKey) {
+                const message = getQuoteByHalfHour();
+                updateMessageWithAnimation(message);
+                localStorage.setItem('lastHalfHourUpdate', currentKey);
+                localStorage.setItem('currentMessage', message);
+            }
+        }
+
+        // 带动画效果更新话语
+        function updateMessageWithAnimation(message) {
+            const messageElement = document.getElementById('dailyMessage');
+            messageElement.style.opacity = '0';
+            messageElement.style.transform = 'translateY(10px)';
+
+            setTimeout(() => {
+                messageElement.textContent = message;
+                messageElement.style.opacity = '1';
+                messageElement.style.transform = 'translateY(0)';
+            }, 300);
+        }
+
+        // 鼠标点击话语区域切换话语
+        function handleQuoteClick() {
+            const message = getQuoteByClick();
+            updateMessageWithAnimation(message);
+            localStorage.setItem('currentMessage', message);
+        }
+
+        // 初始化
+        function init() {
+            createStars();
+            createParticles();
+            updateCountdown();
+            checkAndUpdateDailyMessage();
+            updateDateInfo();
+
+            // 每秒更新倒计时
+            setInterval(updateCountdown, 1000);
+
+            // 每分钟检查是否需要更新话语
+            setInterval(checkAndUpdateDailyMessage, 60000);
+
+            // 每分钟检查是否需要按半小时更新话语
+            setInterval(checkAndUpdateHalfHourMessage, 60000);
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            init();
+
+            // 为话语容器添加点击事件
+            document.getElementById('dailyMessage').addEventListener('click', handleQuoteClick);
+            document.getElementById('dailyMessage').style.cursor = 'pointer';
+            document.getElementById('dailyMessage').style.transition = 'all 0.3s ease';
+            document.getElementById('dailyMessage').style.userSelect = 'none';
+        });
+    </script>
+</body>
+</html>

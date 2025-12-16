@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JWT 解析/编码 - 代码工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>JWT 解析 / 编码</h1>
+            <p>解析 JWT (JSON Web Token) 并查看 Header、Payload 信息，常用于后台调试</p>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <!-- 标签页 -->
+        <div class="card">
+            <div class="tabs">
+                <button class="tab active" data-tab="parse">解析 JWT</button>
+                <button class="tab" data-tab="generate">生成 JWT</button>
+            </div>
+
+            <!-- 解析面板 -->
+            <div id="parse" class="tab-content active">
+                <div class="editor-container">
+                    <label class="editor-label">输入 JWT Token</label>
+                    <textarea id="jwt-input" class="editor" style="min-height: 100px;" placeholder="粘贴 JWT Token...&#10;例如: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"></textarea>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="parse-btn">解析</button>
+                    <button class="btn btn-danger" id="clear-parse-btn">清空</button>
+                </div>
+            </div>
+
+            <!-- 生成面板 -->
+            <div id="generate" class="tab-content">
+                <div class="dual-editor">
+                    <div class="editor-container">
+                        <label class="editor-label">Header (JSON)</label>
+                        <textarea id="header-input" class="editor" style="min-height: 120px;" placeholder='{"alg": "HS256", "typ": "JWT"}'></textarea>
+                    </div>
+                    <div class="editor-container">
+                        <label class="editor-label">Payload (JSON)</label>
+                        <textarea id="payload-input" class="editor" style="min-height: 120px;" placeholder='{"sub": "1234567890", "name": "John Doe", "iat": 1516239022}'></textarea>
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="generate-btn">生成 JWT</button>
+                    <button class="btn btn-danger" id="clear-generate-btn">清空</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 解析结果 -->
+        <div class="card" id="result-section" style="display: none;">
+            <h3 class="card-title">解析结果</h3>
+            
+            <!-- 过期状态 -->
+            <div id="expiry-status" style="display: none; margin-bottom: 15px; padding: 10px; border-radius: 8px;"></div>
+
+            <div class="dual-editor">
+                <div class="editor-container">
+                    <label class="editor-label" style="color: #e74c3c;">Header</label>
+                    <textarea id="header-output" class="editor" style="min-height: 150px;" readonly></textarea>
+                </div>
+                <div class="editor-container">
+                    <label class="editor-label" style="color: #9b59b6;">Payload</label>
+                    <textarea id="payload-output" class="editor" style="min-height: 150px;" readonly></textarea>
+                </div>
+            </div>
+
+            <div class="editor-container" style="margin-top: 15px;">
+                <label class="editor-label" style="color: #3498db;">Signature</label>
+                <textarea id="signature-output" class="editor" style="min-height: 60px;" readonly></textarea>
+            </div>
+        </div>
+
+        <!-- 生成结果 -->
+        <div class="card" id="generated-section" style="display: none;">
+            <h3 class="card-title">生成的 JWT (未签名)</h3>
+            <div class="editor-container">
+                <textarea id="generated-output" class="editor" style="min-height: 80px;" readonly></textarea>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-secondary" id="copy-generated-btn">复制到剪贴板</button>
+            </div>
+            <p style="color: #f39c12; margin-top: 10px; font-size: 0.9rem;">
+                ⚠️ 注意：此工具生成的是未签名的 JWT，仅用于测试目的。生产环境请使用服务端签名。
+            </p>
+        </div>
+    </div>
+
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+    <script>
+        class JWTTool {
+            constructor() {
+                this.fileHandler = new FileHandler();
+                this._bindEvents();
+            }
+
+            _bindEvents() {
+                // 标签页切换
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                        e.target.classList.add('active');
+                        document.getElementById(e.target.dataset.tab).classList.add('active');
+                    });
+                });
+
+                document.getElementById('parse-btn').addEventListener('click', () => this.parse());
+                document.getElementById('generate-btn').addEventListener('click', () => this.generate());
+                document.getElementById('clear-parse-btn').addEventListener('click', () => this.clearParse());
+                document.getElementById('clear-generate-btn').addEventListener('click', () => this.clearGenerate());
+                document.getElementById('copy-generated-btn').addEventListener('click', () => this.copyGenerated());
+            }
+
+            parse() {
+                const token = document.getElementById('jwt-input').value.trim();
+                if (!token) {
+                    CodeUtils.showWarning('请输入 JWT Token');
+                    return;
+                }
+
+                try {
+                    const result = CodeUtils.parseJWT(token);
+                    
+                    document.getElementById('header-output').value = JSON.stringify(result.header, null, 2);
+                    document.getElementById('payload-output').value = JSON.stringify(result.payload, null, 2);
+                    document.getElementById('signature-output').value = result.signature;
+                    
+                    // 显示过期状态
+                    const expiryStatus = document.getElementById('expiry-status');
+                    if (result.expiresAt) {
+                        expiryStatus.style.display = 'block';
+                        if (result.isExpired) {
+                            expiryStatus.style.backgroundColor = '#fdf2f2';
+                            expiryStatus.style.color = '#e74c3c';
+                            expiryStatus.innerHTML = `⚠️ Token 已过期<br>过期时间: ${result.expiresAt.toLocaleString()}`;
+                        } else {
+                            expiryStatus.style.backgroundColor = '#e8f8f5';
+                            expiryStatus.style.color = '#27ae60';
+                            expiryStatus.innerHTML = `✓ Token 有效<br>过期时间: ${result.expiresAt.toLocaleString()}`;
+                        }
+                    } else {
+                        expiryStatus.style.display = 'none';
+                    }
+
+                    document.getElementById('result-section').style.display = 'block';
+                    document.getElementById('jwt-input').classList.remove('error');
+                    CodeUtils.showSuccess('JWT 解析成功');
+                } catch (error) {
+                    document.getElementById('jwt-input').classList.add('error');
+                    CodeUtils.showError(error.message);
+                }
+            }
+
+            generate() {
+                const headerInput = document.getElementById('header-input').value.trim();
+                const payloadInput = document.getElementById('payload-input').value.trim();
+
+                if (!headerInput || !payloadInput) {
+                    CodeUtils.showWarning('请输入 Header 和 Payload');
+                    return;
+                }
+
+                try {
+                    const header = JSON.parse(headerInput);
+                    const payload = JSON.parse(payloadInput);
+                    const jwt = CodeUtils.generateJWT(header, payload);
+                    
+                    document.getElementById('generated-output').value = jwt;
+                    document.getElementById('generated-section').style.display = 'block';
+                    CodeUtils.showSuccess('JWT 生成成功');
+                } catch (error) {
+                    CodeUtils.showError('JSON 格式错误: ' + error.message);
+                }
+            }
+
+            clearParse() {
+                document.getElementById('jwt-input').value = '';
+                document.getElementById('jwt-input').classList.remove('error');
+                document.getElementById('result-section').style.display = 'none';
+            }
+
+            clearGenerate() {
+                document.getElementById('header-input').value = '';
+                document.getElementById('payload-input').value = '';
+                document.getElementById('generated-section').style.display = 'none';
+            }
+
+            async copyGenerated() {
+                const output = document.getElementById('generated-output').value;
+                if (!output) {
+                    CodeUtils.showWarning('没有可复制的内容');
+                    return;
+                }
+                await this.fileHandler.copyToClipboard(output);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new JWTTool();
+        });
+    </script>
+</body>
+</html>

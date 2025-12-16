@@ -1,0 +1,17 @@
+{
+  "name": "pdf-tools-suite",
+  "version": "1.0.0",
+  "description": "完全基于浏览器的 PDF 处理工具集合",
+  "type": "module",
+  "scripts": {
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui"
+  },
+  "devDependencies": {
+    "@vitest/ui": "^1.0.0",
+    "fast-check": "^3.23.2",
+    "jsdom": "^23.0.0",
+    "vitest": "^1.0.0"
+  }
+}

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>格式转换 - 图片工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>图片格式转换</h1>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card" id="upload-section">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">🖼️</div>
+                <h3>点击或拖拽上传图片</h3>
+                <p style="color: #666; font-size: 14px; margin-top: 10px;">支持 JPG、PNG、WEBP、BMP 格式</p>
+            </div>
+        </div>
+
+        <div class="card" id="process-section" style="display: none;">
+            <h3>文件信息</h3>
+            <p id="file-info" style="margin-bottom: 20px; color: #666;"></p>
+            
+            <div class="input-group">
+                <label>目标格式</label>
+                <select id="format-select">
+                    <option value="PNG">PNG</option>
+                    <option value="JPEG">JPEG</option>
+                    <option value="WEBP">WEBP</option>
+                </select>
+            </div>
+
+            <div class="slider-container" id="quality-container" style="display: none;">
+                <div class="slider-label">
+                    <span>图片质量</span>
+                    <span id="quality-value">90%</span>
+                </div>
+                <input type="range" id="quality-slider" class="slider" min="10" max="100" value="90">
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button class="btn btn-primary" id="convert-btn">转换格式</button>
+                <button class="btn btn-secondary" id="reset-btn" style="margin-left: 10px;">重新上传</button>
+            </div>
+
+            <div id="result-section" style="display: none; margin-top: 30px;">
+                <h3>转换结果</h3>
+                <div class="image-viewer">
+                    <canvas id="result-canvas"></canvas>
+                </div>
+                <div class="info" id="result-info" style="text-align: center; margin-top: 15px; color: #666;"></div>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="btn btn-secondary" id="download-btn">下载转换后的图片</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ImageConvertTool {
+            constructor() {
+                this.uploader = new ImageUploader({ multiple: false });
+                this.progress = new ProgressIndicator();
+                this.originalFile = null;
+                this.originalCanvas = null;
+                this.convertedBlob = null;
+                
+                this._initElements();
+                this._bindEvents();
+            }
+
+            _initElements() {
+                this.uploadArea = document.getElementById('upload-area');
+                this.uploadSection = document.getElementById('upload-section');
+                this.processSection = document.getElementById('process-section');
+                this.fileInfo = document.getElementById('file-info');
+                this.formatSelect = document.getElementById('format-select');
+                this.qualityContainer = document.getElementById('quality-container');
+                this.qualitySlider = document.getElementById('quality-slider');
+                this.qualityValue = document.getElementById('quality-value');
+                this.resultSection = document.getElementById('result-section');
+                this.resultCanvas = document.getElementById('result-canvas');
+            }
+
+            _bindEvents() {
+                // 上传区域点击
+                this.uploadArea.addEventListener('click', () => {
+                    this.uploader.selectFiles().then(files => {
+                        this.loadImage(files[0]);
+                    }).catch(err => {});
+                });
+
+                // 拖拽上传
+                this.uploader.setupDropZone(this.uploadArea, (files) => {
+                    this.loadImage(files[0]);
+                });
+
+                // 格式选择
+                this.formatSelect.addEventListener('change', (e) => {
+                    const format = e.target.value;
+                    // JPEG 和 WEBP 显示质量选项
+                    if (format === 'JPEG' || format === 'WEBP') {
+                        this.qualityContainer.style.display = 'block';
+                    } else {
+                        this.qualityContainer.style.display = 'none';
+                    }
+                });
+
+                // 质量滑块
+                this.qualitySlider.addEventListener('input', (e) => {
+                    this.qualityValue.textContent = e.target.value + '%';
+                });
+
+                // 转换按钮
+                document.getElementById('convert-btn').addEventListener('click', () => {
+                    this.convertImage();
+                });
+
+                // 重新上传按钮
+                document.getElementById('reset-btn').addEventListener('click', () => {
+                    this.reset();
+                });
+
+                // 下载按钮
+                document.getElementById('download-btn').addEventListener('click', () => {
+                    this.downloadImage();
+                });
+            }
+
+            async loadImage(file) {
+                try {
+                    this.progress.show('加载图片...');
+                    
+                    this.originalFile = file;
+                    const dataURL = await this.uploader.readAsDataURL(file);
+                    
+                    // 创建临时 canvas 加载图片
+                    const tempCanvas = document.createElement('canvas');
+                    const img = await Utils.loadImageToCanvas(dataURL, tempCanvas);
+                    this.originalCanvas = tempCanvas;
+                    
+                    // 获取当前格式
+                    const currentFormat = Utils.getImageFormat(file);
+                    
+                    // 显示文件信息
+                    this.fileInfo.textContent = `文件名: ${file.name} | 当前格式: ${currentFormat} | 大小: ${Utils.formatFileSize(file.size)} | 尺寸: ${img.width} × ${img.height}`;
+                    
+                    // 切换界面
+                    this.uploadSection.style.display = 'none';
+                    this.processSection.style.display = 'block';
+                    this.resultSection.style.display = 'none';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('图片加载成功！');
+                    
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('图片加载失败: ' + error.message);
+                }
+            }
+
+            async convertImage() {
+                try {
+                    this.progress.show('转换格式...');
+                    
+                    const format = this.formatSelect.value;
+                    const quality = parseInt(this.qualitySlider.value) / 100;
+                    const mimeType = Utils.getMimeType(format);
+                    
+                    // 转换格式
+                    this.convertedBlob = await Utils.canvasToBlob(
+                        this.originalCanvas,
+                        mimeType,
+                        quality
+                    );
+                    
+                    // 显示转换后的图片
+                    const convertedURL = URL.createObjectURL(this.convertedBlob);
+                    await Utils.loadImageToCanvas(convertedURL, this.resultCanvas);
+                    
+                    // 显示信息
+                    const originalSize = this.originalFile.size;
+                    const convertedSize = this.convertedBlob.size;
+                    const originalFormat = Utils.getImageFormat(this.originalFile);
+                    
+                    document.getElementById('result-info').textContent = 
+                        `${originalFormat} (${Utils.formatFileSize(originalSize)}) → ${format} (${Utils.formatFileSize(convertedSize)})`;
+                    
+                    this.resultSection.style.display = 'block';
+                    
+                    // 清理临时 URL
+                    URL.revokeObjectURL(convertedURL);
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('格式转换完成！');
+                    
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('格式转换失败: ' + error.message);
+                }
+            }
+
+            downloadImage() {
+                if (this.convertedBlob) {
+                    const format = this.formatSelect.value.toLowerCase();
+                    const ext = format === 'jpeg' ? 'jpg' : format;
+                    const fileName = this.originalFile.name.replace(/\.[^/.]+$/, '') + '-converted.' + ext;
+                    Utils.downloadFile(this.convertedBlob, fileName);
+                    Utils.showSuccess('下载成功！');
+                }
+            }
+
+            reset() {
+                this.uploadSection.style.display = 'block';
+                this.processSection.style.display = 'none';
+                this.resultSection.style.display = 'none';
+                this.originalFile = null;
+                this.originalCanvas = null;
+                this.convertedBlob = null;
+                this.formatSelect.value = 'PNG';
+                this.qualityContainer.style.display = 'none';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new ImageConvertTool();
+        });
+    </script>
+</body>
+</html>

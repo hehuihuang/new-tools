@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emoji/Unicode转换 - 在线工具箱</title>
+  <link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+      <h1>Emoji/Unicode转换工具</h1>
+      <p>在Emoji字符和Unicode编码之间相互转换</p>
+      <div class="privacy-notice">🔒 所有处理均在本地完成，数据不会上传</div>
+    </header>
+
+    <div class="card">
+      <div class="card-title">转换模式</div>
+      <div class="options-group">
+        <div class="option-item">
+          <input type="radio" name="mode" id="mode-toUnicode" value="toUnicode" checked>
+          <label for="mode-toUnicode">字符转Unicode</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" name="mode" id="mode-toChar" value="toChar">
+          <label for="mode-toChar">Unicode转字符</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="dual-editor">
+      <div class="card">
+        <div class="card-title">输入</div>
+        <div class="editor-container">
+          <textarea id="input" class="editor" placeholder="字符转Unicode模式：输入emoji或特殊字符，如 😀🎉&#10;Unicode转字符模式：输入Unicode编码，如 U+1F600 U+1F389"></textarea>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="convertText()">转换</button>
+          <button class="btn btn-secondary" onclick="clearInput()">清空</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">转换结果</div>
+        <div class="editor-container">
+          <textarea id="output" class="editor" readonly placeholder="转换结果将显示在这里..."></textarea>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-success" onclick="copyResult()">复制结果</button>
+        </div>
+        <div id="stats" class="stats"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">使用说明</div>
+      <ul style="line-height: 1.8; color: #666;">
+        <li><strong>字符转Unicode：</strong>输入任意字符（包括emoji），将转换为 U+XXXX 格式的Unicode编码</li>
+        <li><strong>Unicode转字符：</strong>输入 U+XXXX 格式的Unicode编码，将转换为对应的字符</li>
+        <li>支持批量转换，多个字符或编码用空格分隔</li>
+        <li>示例：😀 → U+1F600，U+1F600 → 😀</li>
+      </ul>
+    </div>
+  </div>
+
+  <script type="module">
+    import { showMessage, copyToClipboard, updateStats } from './shared/components.js';
+
+    window.showMessage = showMessage;
+    window.copyToClipboard = copyToClipboard;
+    window.updateStats = updateStats;
+
+    /**
+     * 字符转Unicode
+     */
+    function charToUnicode(text) {
+      if (!text) return '';
+      
+      const result = [];
+      for (const char of text) {
+        const codePoint = char.codePointAt(0);
+        result.push('U+' + codePoint.toString(16).toUpperCase().padStart(4, '0'));
+      }
+      
+      return result.join(' ');
+    }
+
+    /**
+     * Unicode转字符
+     */
+    function unicodeToChar(text) {
+      if (!text) return '';
+      
+      // 匹配 U+XXXX 或 \uXXXX 或 0xXXXX 格式
+      const unicodePattern = /(?:U\+|\\u|0x)([0-9A-Fa-f]+)/g;
+      const matches = text.matchAll(unicodePattern);
+      
+      const result = [];
+      for (const match of matches) {
+        try {
+          const codePoint = parseInt(match[1], 16);
+          if (isValidUnicode(codePoint)) {
+            result.push(String.fromCodePoint(codePoint));
+          } else {
+            result.push(`[无效:${match[0]}]`);
+          }
+        } catch (error) {
+          result.push(`[错误:${match[0]}]`);
+        }
+      }
+      
+      return result.join('');
+    }
+
+    /**
+     * 验证Unicode编码是否有效
+     */
+    function isValidUnicode(codePoint) {
+      return codePoint >= 0 && codePoint <= 0x10FFFF;
+    }
+
+    /**
+     * 转换文本
+     */
+    window.convertText = function() {
+      const input = document.getElementById('input').value;
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      
+      if (!input.trim()) {
+        showMessage('error', '请输入要转换的内容');
+        return;
+      }
+      
+      try {
+        let result;
+        let stats;
+        
+        if (mode === 'toUnicode') {
+          result = charToUnicode(input);
+          const charCount = [...input].length;
+          stats = {
+            '转换模式': '字符 → Unicode',
+            '字符数': charCount,
+            '编码数': charCount
+          };
+        } else {
+          result = unicodeToChar(input);
+          const unicodePattern = /(?:U\+|\\u|0x)([0-9A-Fa-f]+)/g;
+          const matches = [...input.matchAll(unicodePattern)];
+          stats = {
+            '转换模式': 'Unicode → 字符',
+            '编码数': matches.length,
+            '字符数': [...result].length
+          };
+        }
+        
+        if (!result) {
+          showMessage('error', '转换失败，请检查输入格式');
+          return;
+        }
+        
+        document.getElementById('output').value = result;
+        updateStats(stats, document.getElementById('stats'));
+        showMessage('success', '转换完成');
+      } catch (error) {
+        showMessage('error', '转换出错：' + error.message);
+      }
+    };
+
+    window.clearInput = function() {
+      document.getElementById('input').value = '';
+      document.getElementById('output').value = '';
+      document.getElementById('stats').innerHTML = '';
+    };
+
+    window.copyResult = function() {
+      const output = document.getElementById('output').value;
+      if (!output) {
+        showMessage('error', '没有可复制的内容');
+        return;
+      }
+      copyToClipboard(output);
+    };
+
+    // 导出供测试使用
+    window.charToUnicode = charToUnicode;
+    window.unicodeToChar = unicodeToChar;
+    window.isValidUnicode = isValidUnicode;
+  </script>
+</body>
+</html>

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON 格式化 - JSON 工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>JSON 格式化与压缩</h1>
+            <p>美化或压缩 JSON 数据，提高可读性或减小数据大小</p>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card">
+            <div class="editor-container">
+                <label class="editor-label">输入 JSON 数据</label>
+                <textarea id="input-editor" class="editor" placeholder="在此输入或粘贴 JSON 数据..."></textarea>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" id="format-btn">格式化</button>
+                <button class="btn btn-primary" id="compress-btn">压缩</button>
+                <button class="btn btn-secondary" id="upload-btn">上传文件</button>
+                <button class="btn btn-danger" id="clear-btn">清空</button>
+            </div>
+        </div>
+
+        <div class="card" id="output-section" style="display: none;">
+            <div class="editor-container">
+                <label class="editor-label">输出结果</label>
+                <textarea id="output-editor" class="editor" readonly></textarea>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-secondary" id="copy-btn">复制到剪贴板</button>
+                <button class="btn btn-secondary" id="download-btn">下载文件</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+    <script>
+        class JSONFormatterTool {
+            constructor() {
+                this.inputEditor = document.getElementById('input-editor');
+                this.outputEditor = document.getElementById('output-editor');
+                this.outputSection = document.getElementById('output-section');
+                this.fileHandler = new FileHandler();
+                this.currentMode = null; // 'format' or 'compress'
+                
+                this._bindEvents();
+            }
+
+            _bindEvents() {
+                // 格式化按钮
+                document.getElementById('format-btn').addEventListener('click', () => {
+                    this.formatJSON();
+                });
+
+                // 压缩按钮
+                document.getElementById('compress-btn').addEventListener('click', () => {
+                    this.compressJSON();
+                });
+
+                // 上传按钮
+                document.getElementById('upload-btn').addEventListener('click', async () => {
+                    try {
+                        const file = await this.fileHandler.uploadFile(['.json', '.txt']);
+                        const content = await this.fileHandler.readAsText(file);
+                        this.inputEditor.value = content;
+                        Utils.showSuccess('文件上传成功');
+                    } catch (error) {
+                        if (error.message !== '未选择文件') {
+                            Utils.showError('文件上传失败: ' + error.message);
+                        }
+                    }
+                });
+
+                // 清空按钮
+                document.getElementById('clear-btn').addEventListener('click', () => {
+                    this.clear();
+                });
+
+                // 复制按钮
+                document.getElementById('copy-btn').addEventListener('click', async () => {
+                    try {
+                        await this.fileHandler.copyToClipboard(this.outputEditor.value);
+                    } catch (error) {
+                        // 错误已在 Utils 中处理
+                    }
+                });
+
+                // 下载按钮
+                document.getElementById('download-btn').addEventListener('click', () => {
+                    this.downloadResult();
+                });
+            }
+
+            formatJSON() {
+                const input = this.inputEditor.value.trim();
+                
+                if (!input) {
+                    Utils.showError('请输入 JSON 数据');
+                    return;
+                }
+
+                try {
+                    Utils.showLoading('格式化中...');
+                    const formatted = Utils.formatJSON(input, 2);
+                    this.outputEditor.value = formatted;
+                    this.outputSection.style.display = 'block';
+                    this.currentMode = 'format';
+                    this.inputEditor.classList.remove('error');
+                    Utils.hideLoading();
+                    Utils.showSuccess('JSON 格式化成功');
+                } catch (error) {
+                    Utils.hideLoading();
+                    this.inputEditor.classList.add('error');
+                    Utils.showError(error.message);
+                    this.outputSection.style.display = 'none';
+                }
+            }
+
+            compressJSON() {
+                const input = this.inputEditor.value.trim();
+                
+                if (!input) {
+                    Utils.showError('请输入 JSON 数据');
+                    return;
+                }
+
+                try {
+                    Utils.showLoading('压缩中...');
+                    const compressed = Utils.compressJSON(input);
+                    this.outputEditor.value = compressed;
+                    this.outputSection.style.display = 'block';
+                    this.currentMode = 'compress';
+                    this.inputEditor.classList.remove('error');
+                    
+                    // 显示压缩统计
+                    const originalSize = input.length;
+                    const compressedSize = compressed.length;
+                    const ratio = ((originalSize - compressedSize) / originalSize * 100).toFixed(1);
+                    
+                    Utils.hideLoading();
+                    Utils.showSuccess(`JSON 压缩成功！减少了 ${ratio}% 的大小`);
+                } catch (error) {
+                    Utils.hideLoading();
+                    this.inputEditor.classList.add('error');
+                    Utils.showError(error.message);
+                    this.outputSection.style.display = 'none';
+                }
+            }
+
+            downloadResult() {
+                if (!this.outputEditor.value) {
+                    Utils.showError('没有可下载的内容');
+                    return;
+                }
+
+                const filename = Utils.generateFilename(
+                    this.currentMode === 'compress' ? 'compressed' : 'formatted',
+                    'json'
+                );
+                
+                this.fileHandler.downloadFile(this.outputEditor.value, filename);
+                Utils.showSuccess('文件下载成功');
+            }
+
+            clear() {
+                this.inputEditor.value = '';
+                this.outputEditor.value = '';
+                this.outputSection.style.display = 'none';
+                this.inputEditor.classList.remove('error');
+                this.currentMode = null;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new JSONFormatterTool();
+        });
+    </script>
+</body>
+</html>

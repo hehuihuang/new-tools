@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>房贷还款计算器 - 财税工具</title>
+  <link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+  <div class="container">
+    <div id="header"></div>
+
+    <div class="card">
+      <h3 class="card-title">输入信息</h3>
+      
+      <div id="principal-input"></div>
+      <div id="rate-input"></div>
+      <div id="months-input"></div>
+      
+      <div class="options-group">
+        <div class="option-item">
+          <input type="radio" id="method-equal-payment" name="method" value="equal-payment" checked>
+          <label for="method-equal-payment">等额本息</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" id="method-equal-principal" name="method" value="equal-principal">
+          <label for="method-equal-principal">等额本金</label>
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="calculate()">计算</button>
+        <button class="btn btn-secondary" onclick="clearForm()">清空</button>
+      </div>
+    </div>
+
+    <div id="result-container" style="display: none;">
+      <div id="result-card"></div>
+      <div id="schedule-card"></div>
+      <div id="details-card"></div>
+    </div>
+  </div>
+
+  <script src="shared/components.js"></script>
+  <script src="shared/utils.js"></script>
+  <script src="shared/calculators.js"></script>
+  <script>
+    document.getElementById('header').innerHTML = createFinanceHeader(
+      '房贷还款计算器',
+      '计算房贷月供和总利息，支持等额本息和等额本金两种方式'
+    );
+
+    document.getElementById('principal-input').innerHTML = createInputGroup({
+      label: '贷款本金',
+      id: 'principal',
+      type: 'number',
+      placeholder: '请输入贷款本金',
+      required: true,
+      min: 0,
+      step: '10000',
+      unit: '元'
+    });
+
+    document.getElementById('rate-input').innerHTML = createInputGroup({
+      label: '年利率',
+      id: 'rate',
+      type: 'number',
+      placeholder: '例如: 4.9',
+      required: true,
+      min: 0,
+      max: 20,
+      step: '0.01',
+      unit: '%',
+      hint: '商业贷款约4.9%，公积金贷款约3.25%'
+    });
+
+    document.getElementById('months-input').innerHTML = createInputGroup({
+      label: '贷款期限',
+      id: 'months',
+      type: 'select',
+      required: true,
+      options: [
+        { value: '12', label: '1年' },
+        { value: '24', label: '2年' },
+        { value: '36', label: '3年' },
+        { value: '60', label: '5年' },
+        { value: '120', label: '10年' },
+        { value: '180', label: '15年' },
+        { value: '240', label: '20年' },
+        { value: '300', label: '25年' },
+        { value: '360', label: '30年' }
+      ]
+    });
+
+    function calculate() {
+      clearAllInputErrors();
+      
+      const principal = document.getElementById('principal').value;
+      const rate = document.getElementById('rate').value;
+      const months = document.getElementById('months').value;
+      const method = document.querySelector('input[name="method"]:checked').value;
+
+      const principalValidation = validateNumber(principal, 0);
+      if (!principalValidation.valid) {
+        showInputError('principal', principalValidation.error);
+        return;
+      }
+
+      const rateValidation = validateNumber(rate, 0, 20);
+      if (!rateValidation.valid) {
+        showInputError('rate', rateValidation.error);
+        return;
+      }
+
+      const result = calculateMortgage(
+        principalValidation.value,
+        rateValidation.value / 100,
+        Number(months),
+        method
+      );
+
+      displayResults(result);
+      saveToHistory('mortgage', { principal: principalValidation.value, rate: rateValidation.value, months, method, result });
+    }
+
+    function displayResults(result) {
+      const methodLabel = result.method === 'equal-payment' ? '等额本息' : '等额本金';
+      const monthlyLabel = result.method === 'equal-payment' ? '月供' : '首月月供';
+      
+      const resultData = {
+        monthlyPayment: {
+          label: monthlyLabel,
+          value: formatCurrency(result.monthlyPayment) + ' 元',
+          highlight: true
+        },
+        totalPayment: {
+          label: '还款总额',
+          value: formatCurrency(result.totalPayment) + ' 元'
+        },
+        totalInterest: {
+          label: '利息总额',
+          value: formatCurrency(result.totalInterest) + ' 元'
+        },
+        method: {
+          label: '还款方式',
+          value: methodLabel
+        }
+      };
+
+      document.getElementById('result-card').innerHTML = createResultCard('计算结果', resultData);
+
+      // 显示还款计划表
+      const scheduleHTML = createScheduleTable(result.schedule.map(item => ({
+        period: item.period,
+        payment: formatCurrency(item.payment),
+        principal: formatCurrency(item.principal),
+        interest: formatCurrency(item.interest),
+        balance: formatCurrency(item.balance)
+      })));
+
+      document.getElementById('schedule-card').innerHTML = createCollapsible(
+        '还款计划表',
+        `<div class="card">${scheduleHTML}</div>`,
+        false
+      );
+
+      const detailsHTML = createDetailsList(result.steps.map(step => ({
+        label: step.label,
+        value: typeof step.value === 'number' ? formatCurrency(step.value) : step.value,
+        formula: step.formula
+      })));
+
+      document.getElementById('details-card').innerHTML = createCollapsible(
+        '详细计算过程',
+        `<div class="card">${detailsHTML}</div>`,
+        false
+      );
+
+      document.getElementById('result-container').style.display = 'block';
+      showMessage('success', '计算完成');
+    }
+
+    function clearForm() {
+      document.getElementById('principal').value = '';
+      document.getElementById('rate').value = '';
+      document.getElementById('method-equal-payment').checked = true;
+      document.getElementById('result-container').style.display = 'none';
+      clearAllInputErrors();
+    }
+  </script>
+</body>
+</html>

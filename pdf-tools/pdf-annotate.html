@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF 批注 - PDF 工具套件</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <link rel="stylesheet" href="./shared/styles.css">
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+    
+    <style>
+        .toolbar { 
+            display: flex; 
+            gap: 10px; 
+            margin-bottom: 20px; 
+            padding: 15px; 
+            background: #f5f5f5; 
+            border-radius: 4px; 
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .toolbar-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding: 5px 10px;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .toolbar-group label {
+            font-size: 14px;
+            color: #666;
+            margin: 0;
+        }
+        .toolbar-group select,
+        .toolbar-group input[type="number"] {
+            padding: 5px 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+        .toolbar-group input[type="color"] {
+            width: 40px;
+            height: 30px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .tool-btn {
+            padding: 8px 15px;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tool-btn:hover {
+            background: #f0f0f0;
+        }
+        .tool-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .canvas-container { 
+            position: relative; 
+            background: #525659; 
+            padding: 20px; 
+            border-radius: 8px; 
+            max-height: 600px; 
+            overflow-y: auto; 
+            text-align: center; 
+        }
+        .page-wrapper {
+            margin-bottom: 30px;
+            position: relative;
+            display: inline-block;
+        }
+        .page-number {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            z-index: 10;
+        }
+        .pdf-page-canvas { 
+            max-width: 100%; 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3); 
+            background: white; 
+            cursor: crosshair; 
+            display: block;
+        }
+        .annotation-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+        .annotation-text {
+            position: absolute;
+            cursor: move;
+            pointer-events: all;
+            padding: 2px 5px;
+            border-radius: 3px;
+            white-space: nowrap;
+            user-select: none;
+        }
+        .annotation-text:hover {
+            outline: 2px dashed #007bff;
+        }
+        .annotation-text.selected {
+            outline: 2px solid #007bff;
+        }
+        .text-input-popup {
+            position: fixed;
+            background: white;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 1000;
+            min-width: 300px;
+        }
+        .text-input-popup textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+        }
+        .text-input-popup .popup-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            justify-content: flex-end;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>PDF 批注</h1>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card" id="upload-section">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">📄</div>
+                <h3>点击或拖拽上传 PDF 文件</h3>
+            </div>
+        </div>
+
+        <div class="card" id="annotate-section" style="display: none;">
+            <div class="toolbar">
+                <button class="tool-btn" id="text-tool">📝 文字批注</button>
+                
+                <div class="toolbar-group">
+                    <label>字体:</label>
+                    <select id="font-family">
+                        <option value="Microsoft YaHei">微软雅黑</option>
+                        <option value="SimHei">黑体</option>
+                        <option value="SimSun">宋体</option>
+                        <option value="KaiTi">楷体</option>
+                        <option value="Arial">Arial</option>
+                        <option value="Times New Roman">Times New Roman</option>
+                    </select>
+                </div>
+                
+                <div class="toolbar-group">
+                    <label>大小:</label>
+                    <input type="number" id="font-size" value="16" min="8" max="72" style="width: 60px;">
+                    <span>px</span>
+                </div>
+                
+                <div class="toolbar-group">
+                    <label>颜色:</label>
+                    <input type="color" id="text-color" value="#ff0000">
+                </div>
+                
+                <div class="toolbar-group">
+                    <label>背景:</label>
+                    <input type="color" id="bg-color" value="#ffff00">
+                    <label><input type="checkbox" id="use-bg"> 启用</label>
+                </div>
+                
+                <div class="toolbar-group">
+                    <label>粗体:</label>
+                    <input type="checkbox" id="font-bold">
+                    <label>斜体:</label>
+                    <input type="checkbox" id="font-italic">
+                </div>
+                
+                <button class="btn btn-warning" id="undo-tool" disabled>↶ 撤销</button>
+                <button class="btn btn-danger" id="clear-tool">🗑️ 清除所有</button>
+            </div>
+            
+            <div class="canvas-container" id="pages-container">
+                <!-- 页面将动态添加到这里 -->
+            </div>
+            
+            <button class="btn btn-primary" id="save-btn" style="margin-top: 20px;">💾 保存 PDF</button>
+        </div>
+    </div>
+
+    <script>
+        class PDFAnnotateTool {
+            constructor() {
+                this.uploader = new FileUploader({ multiple: false });
+                this.progress = new ProgressIndicator();
+                this.pdfDoc = null;
+                this.pdf = null;
+                this.annotations = {};
+                this.history = []; // 历史记录栈
+                this.currentTool = null;
+                this.canvases = [];
+                this.textPopup = null;
+                this.selectedAnnotation = null;
+                
+                this._initElements();
+                this._bindEvents();
+            }
+
+            _initElements() {
+                this.uploadArea = document.getElementById('upload-area');
+                this.uploadSection = document.getElementById('upload-section');
+                this.annotateSection = document.getElementById('annotate-section');
+                this.pagesContainer = document.getElementById('pages-container');
+                this.textTool = document.getElementById('text-tool');
+                this.undoBtn = document.getElementById('undo-tool');
+                this.fontFamily = document.getElementById('font-family');
+                this.fontSize = document.getElementById('font-size');
+                this.textColor = document.getElementById('text-color');
+                this.bgColor = document.getElementById('bg-color');
+                this.useBg = document.getElementById('use-bg');
+                this.fontBold = document.getElementById('font-bold');
+                this.fontItalic = document.getElementById('font-italic');
+            }
+
+            _bindEvents() {
+                this.uploadArea.addEventListener('click', () => {
+                    this.uploader.selectFiles().then(files => {
+                        this.loadPDF(files[0]);
+                    }).catch(err => {});
+                });
+
+                this.uploader.setupDropZone(this.uploadArea, (files) => {
+                    this.loadPDF(files[0]);
+                });
+
+                this.textTool.addEventListener('click', () => {
+                    this.currentTool = this.currentTool === 'text' ? null : 'text';
+                    this.textTool.classList.toggle('active');
+                });
+
+                this.undoBtn.addEventListener('click', () => {
+                    this._undo();
+                });
+
+                document.getElementById('clear-tool').addEventListener('click', () => {
+                    if (confirm('确定要清除所有批注吗？')) {
+                        this._saveHistory();
+                        this.annotations = {};
+                        this._refreshAllPages();
+                        this._updateUndoButton();
+                    }
+                });
+
+                document.getElementById('save-btn').addEventListener('click', () => {
+                    this.savePDF();
+                });
+                
+                // 点击页面外关闭弹窗
+                document.addEventListener('click', (e) => {
+                    if (this.textPopup && !this.textPopup.contains(e.target)) {
+                        const clickedCanvas = e.target.closest('.page-wrapper');
+                        if (!clickedCanvas) {
+                            this._closeTextPopup();
+                        }
+                    }
+                });
+            }
+
+            async loadPDF(file) {
+                try {
+                    this.progress.show('加载 PDF...');
+                    
+                    const arrayBuffer = await this.uploader.readAsArrayBuffer(file);
+                    this.pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+                    
+                    // 渲染所有页面
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                    this.pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    
+                    // 清空容器
+                    this.pagesContainer.innerHTML = '';
+                    this.canvases = [];
+                    
+                    // 渲染所有页面
+                    for (let pageNum = 1; pageNum <= this.pdf.numPages; pageNum++) {
+                        await this._renderPage(pageNum);
+                    }
+                    
+                    this.uploadSection.style.display = 'none';
+                    this.annotateSection.style.display = 'block';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess(`PDF 加载成功！共 ${this.pdf.numPages} 页`);
+                    
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('PDF 加载失败: ' + error.message);
+                }
+            }
+
+            async _renderPage(pageNum) {
+                const page = await this.pdf.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 1.5 });
+                
+                // 创建页面包装器
+                const pageWrapper = document.createElement('div');
+                pageWrapper.className = 'page-wrapper';
+                pageWrapper.style.position = 'relative';
+                
+                // 创建页码标签
+                const pageLabel = document.createElement('div');
+                pageLabel.className = 'page-number';
+                pageLabel.textContent = `第 ${pageNum} 页`;
+                pageWrapper.appendChild(pageLabel);
+                
+                // 创建 canvas
+                const canvas = document.createElement('canvas');
+                canvas.className = 'pdf-page-canvas';
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                canvas.dataset.pageNum = pageNum;
+                
+                const ctx = canvas.getContext('2d');
+                
+                // 渲染 PDF 页面
+                await page.render({ canvasContext: ctx, viewport }).promise;
+                
+                // 创建批注覆盖层
+                const overlay = document.createElement('div');
+                overlay.className = 'annotation-overlay';
+                overlay.style.width = viewport.width + 'px';
+                overlay.style.height = viewport.height + 'px';
+                overlay.dataset.pageNum = pageNum;
+                
+                // 添加点击事件
+                canvas.addEventListener('click', (e) => {
+                    if (this.currentTool === 'text') {
+                        const rect = canvas.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        const y = e.clientY - rect.top;
+                        this._showTextPopup(pageNum, x, y, e.clientX, e.clientY);
+                    }
+                });
+                
+                pageWrapper.appendChild(canvas);
+                pageWrapper.appendChild(overlay);
+                this.pagesContainer.appendChild(pageWrapper);
+                
+                this.canvases.push({ pageNum, canvas, ctx, viewport, overlay });
+                
+                // 渲染已有批注
+                this._renderAnnotations(pageNum, overlay);
+            }
+
+            _showTextPopup(pageNum, x, y, screenX, screenY) {
+                this._closeTextPopup();
+                
+                const popup = document.createElement('div');
+                popup.className = 'text-input-popup';
+                popup.style.left = screenX + 'px';
+                popup.style.top = screenY + 'px';
+                
+                popup.innerHTML = `
+                    <textarea placeholder="输入批注文字..." autofocus></textarea>
+                    <div class="popup-buttons">
+                        <button class="btn btn-secondary btn-sm" id="popup-cancel">取消</button>
+                        <button class="btn btn-primary btn-sm" id="popup-ok">确定</button>
+                    </div>
+                `;
+                
+                document.body.appendChild(popup);
+                this.textPopup = popup;
+                
+                const textarea = popup.querySelector('textarea');
+                textarea.focus();
+                
+                popup.querySelector('#popup-ok').addEventListener('click', () => {
+                    const text = textarea.value.trim();
+                    if (text) {
+                        this._addAnnotation(pageNum, x, y, text);
+                    }
+                    this._closeTextPopup();
+                });
+                
+                popup.querySelector('#popup-cancel').addEventListener('click', () => {
+                    this._closeTextPopup();
+                });
+                
+                textarea.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                        popup.querySelector('#popup-ok').click();
+                    } else if (e.key === 'Escape') {
+                        this._closeTextPopup();
+                    }
+                });
+            }
+
+            _closeTextPopup() {
+                if (this.textPopup) {
+                    this.textPopup.remove();
+                    this.textPopup = null;
+                }
+            }
+
+            _saveHistory() {
+                // 深拷贝当前状态
+                this.history.push(JSON.parse(JSON.stringify(this.annotations)));
+                // 限制历史记录数量
+                if (this.history.length > 20) {
+                    this.history.shift();
+                }
+            }
+
+            _undo() {
+                if (this.history.length > 0) {
+                    this.annotations = this.history.pop();
+                    this._refreshAllPages();
+                    this._updateUndoButton();
+                }
+            }
+
+            _updateUndoButton() {
+                this.undoBtn.disabled = this.history.length === 0;
+            }
+
+            _addAnnotation(pageNum, x, y, text) {
+                // 保存历史记录
+                this._saveHistory();
+                
+                if (!this.annotations[pageNum]) {
+                    this.annotations[pageNum] = [];
+                }
+                
+                const annotation = {
+                    type: 'text',
+                    x,
+                    y,
+                    text,
+                    fontFamily: this.fontFamily.value,
+                    fontSize: parseInt(this.fontSize.value),
+                    color: this.textColor.value,
+                    bgColor: this.useBg.checked ? this.bgColor.value : null,
+                    bold: this.fontBold.checked,
+                    italic: this.fontItalic.checked
+                };
+                
+                this.annotations[pageNum].push(annotation);
+                
+                // 重新渲染该页批注
+                const canvasInfo = this.canvases.find(c => c.pageNum === pageNum);
+                if (canvasInfo) {
+                    this._renderAnnotations(pageNum, canvasInfo.overlay);
+                }
+                
+                this._updateUndoButton();
+            }
+
+            _renderAnnotations(pageNum, overlay) {
+                // 清空覆盖层
+                overlay.innerHTML = '';
+                
+                const annotations = this.annotations[pageNum] || [];
+                annotations.forEach((ann, index) => {
+                    if (ann.type === 'text') {
+                        const textEl = document.createElement('div');
+                        textEl.className = 'annotation-text';
+                        textEl.textContent = ann.text;
+                        textEl.style.left = ann.x + 'px';
+                        textEl.style.top = ann.y + 'px';
+                        textEl.style.fontFamily = ann.fontFamily;
+                        textEl.style.fontSize = ann.fontSize + 'px';
+                        textEl.style.color = ann.color;
+                        textEl.style.fontWeight = ann.bold ? 'bold' : 'normal';
+                        textEl.style.fontStyle = ann.italic ? 'italic' : 'normal';
+                        
+                        if (ann.bgColor) {
+                            textEl.style.backgroundColor = ann.bgColor;
+                        }
+                        
+                        // 双击删除
+                        textEl.addEventListener('dblclick', () => {
+                            if (confirm('删除这条批注？')) {
+                                this._saveHistory();
+                                this.annotations[pageNum].splice(index, 1);
+                                this._renderAnnotations(pageNum, overlay);
+                                this._updateUndoButton();
+                            }
+                        });
+                        
+                        // 拖动功能
+                        this._makeDraggable(textEl, ann);
+                        
+                        overlay.appendChild(textEl);
+                    }
+                });
+            }
+
+            _makeDraggable(element, annotation) {
+                let isDragging = false;
+                let startX, startY;
+                
+                element.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                    startX = e.clientX - annotation.x;
+                    startY = e.clientY - annotation.y;
+                    element.style.cursor = 'grabbing';
+                    e.preventDefault();
+                });
+                
+                document.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        annotation.x = e.clientX - startX;
+                        annotation.y = e.clientY - startY;
+                        element.style.left = annotation.x + 'px';
+                        element.style.top = annotation.y + 'px';
+                    }
+                });
+                
+                document.addEventListener('mouseup', () => {
+                    if (isDragging) {
+                        isDragging = false;
+                        element.style.cursor = 'move';
+                    }
+                });
+            }
+
+            async _refreshAllPages() {
+                for (const { pageNum, overlay } of this.canvases) {
+                    this._renderAnnotations(pageNum, overlay);
+                }
+            }
+
+            async savePDF() {
+                try {
+                    this.progress.show('生成批注...');
+                    
+                    const pages = this.pdfDoc.getPages();
+                    
+                    // 遍历所有批注并添加到 PDF
+                    for (const [pageNum, annotations] of Object.entries(this.annotations)) {
+                        if (annotations.length === 0) continue;
+                        
+                        const pageIndex = parseInt(pageNum) - 1;
+                        const page = pages[pageIndex];
+                        const { height } = page.getSize();
+                        
+                        this.progress.show(`处理第 ${pageNum} 页批注...`);
+                        
+                        for (const ann of annotations) {
+                            if (ann.type === 'text') {
+                                // 使用 Canvas 生成文字图片
+                                const canvas = document.createElement('canvas');
+                                const ctx = canvas.getContext('2d');
+                                
+                                // 设置字体
+                                const fontStyle = `${ann.italic ? 'italic' : ''} ${ann.bold ? 'bold' : ''} ${ann.fontSize}px "${ann.fontFamily}"`;
+                                ctx.font = fontStyle;
+                                
+                                // 测量文字
+                                const metrics = ctx.measureText(ann.text);
+                                const textWidth = metrics.width;
+                                const textHeight = ann.fontSize * 1.5;
+                                
+                                // 设置 canvas 尺寸
+                                const scale = 2;
+                                canvas.width = (textWidth + 10) * scale;
+                                canvas.height = textHeight * scale;
+                                
+                                ctx.scale(scale, scale);
+                                ctx.font = fontStyle;
+                                ctx.textBaseline = 'middle';
+                                
+                                // 绘制背景
+                                if (ann.bgColor) {
+                                    ctx.fillStyle = ann.bgColor;
+                                    ctx.fillRect(0, 0, textWidth + 10, textHeight);
+                                }
+                                
+                                // 绘制文字
+                                ctx.fillStyle = ann.color;
+                                ctx.fillText(ann.text, 5, textHeight / 2);
+                                
+                                // 转换为 PNG
+                                const pngDataUrl = canvas.toDataURL('image/png');
+                                const pngData = pngDataUrl.split(',')[1];
+                                const pngBytes = Uint8Array.from(atob(pngData), c => c.charCodeAt(0));
+                                
+                                // 嵌入图片
+                                const image = await this.pdfDoc.embedPng(pngBytes);
+                                
+                                // PDF 坐标系是从底部开始的，需要转换
+                                const pdfY = height - ann.y - textHeight;
+                                
+                                page.drawImage(image, {
+                                    x: ann.x,
+                                    y: pdfY,
+                                    width: textWidth + 10,
+                                    height: textHeight
+                                });
+                            }
+                        }
+                    }
+                    
+                    this.progress.show('保存 PDF...');
+                    const pdfBytes = await this.pdfDoc.save();
+                    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                    
+                    Utils.downloadFile(blob, 'annotated.pdf');
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('PDF 保存成功！');
+                    
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('PDF 保存失败: ' + error.message);
+                    console.error(error);
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new PDFAnnotateTool();
+        });
+    </script>
+</body>
+</html>

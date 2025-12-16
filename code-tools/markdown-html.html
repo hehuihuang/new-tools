@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown / HTML 转换 - 代码工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/turndown/dist/turndown.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>Markdown / HTML 转换</h1>
+            <p>将 Markdown 转成 HTML，或反向转换，常用于文档、页面内容处理</p>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <!-- 转换方向选择 -->
+        <div class="card">
+            <div class="radio-group">
+                <label class="radio-label">
+                    <input type="radio" name="direction" value="md2html" checked>
+                    Markdown → HTML
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="direction" value="html2md">
+                    HTML → Markdown
+                </label>
+            </div>
+        </div>
+
+        <!-- 编辑器区域 -->
+        <div class="card">
+            <div class="dual-editor">
+                <div class="editor-container">
+                    <label class="editor-label" id="input-label">输入 Markdown</label>
+                    <textarea id="input-editor" class="editor" placeholder="在此输入 Markdown 内容..."></textarea>
+                </div>
+                <div class="editor-container">
+                    <label class="editor-label" id="output-label">输出 HTML</label>
+                    <textarea id="output-editor" class="editor" readonly placeholder="转换结果将显示在这里..."></textarea>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" id="convert-btn">转换</button>
+                <button class="btn btn-secondary" id="copy-btn">复制结果</button>
+                <button class="btn btn-secondary" id="download-btn">下载文件</button>
+                <button class="btn btn-danger" id="clear-btn">清空</button>
+            </div>
+        </div>
+
+        <!-- 实时预览 -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 class="card-title" style="margin: 0; border: none; padding: 0;">实时预览</h3>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="live-preview" checked>
+                    启用实时预览
+                </label>
+            </div>
+            <div id="preview" class="preview"></div>
+        </div>
+    </div>
+
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+    <script>
+        class MarkdownHTMLTool {
+            constructor() {
+                this.inputEditor = document.getElementById('input-editor');
+                this.outputEditor = document.getElementById('output-editor');
+                this.preview = document.getElementById('preview');
+                this.direction = 'md2html';
+                this.fileHandler = new FileHandler();
+                
+                this._bindEvents();
+                this._updateLabels();
+            }
+
+            _bindEvents() {
+                // 转换方向切换
+                document.querySelectorAll('input[name="direction"]').forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        this.direction = e.target.value;
+                        this._updateLabels();
+                        this._clearAll();
+                    });
+                });
+
+                // 转换按钮
+                document.getElementById('convert-btn').addEventListener('click', () => {
+                    this.convert();
+                });
+
+                // 复制按钮
+                document.getElementById('copy-btn').addEventListener('click', async () => {
+                    const output = this.outputEditor.value;
+                    if (!output) {
+                        CodeUtils.showWarning('没有可复制的内容');
+                        return;
+                    }
+                    await this.fileHandler.copyToClipboard(output);
+                });
+
+                // 下载按钮
+                document.getElementById('download-btn').addEventListener('click', () => {
+                    this.download();
+                });
+
+                // 清空按钮
+                document.getElementById('clear-btn').addEventListener('click', () => {
+                    this._clearAll();
+                });
+
+                // 实时预览
+                this.inputEditor.addEventListener('input', () => {
+                    if (document.getElementById('live-preview').checked) {
+                        this.convert();
+                    }
+                });
+
+                // 预览开关
+                document.getElementById('live-preview').addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        this.convert();
+                    }
+                });
+            }
+
+            _updateLabels() {
+                const inputLabel = document.getElementById('input-label');
+                const outputLabel = document.getElementById('output-label');
+                
+                if (this.direction === 'md2html') {
+                    inputLabel.textContent = '输入 Markdown';
+                    outputLabel.textContent = '输出 HTML';
+                    this.inputEditor.placeholder = '在此输入 Markdown 内容...\n\n例如：\n# 标题\n\n这是一段**粗体**文本。\n\n- 列表项1\n- 列表项2';
+                } else {
+                    inputLabel.textContent = '输入 HTML';
+                    outputLabel.textContent = '输出 Markdown';
+                    this.inputEditor.placeholder = '在此输入 HTML 内容...\n\n例如：\n<h1>标题</h1>\n<p>这是一段<strong>粗体</strong>文本。</p>';
+                }
+            }
+
+            convert() {
+                const input = this.inputEditor.value.trim();
+                
+                if (!input) {
+                    this.outputEditor.value = '';
+                    this.preview.innerHTML = '<p style="color: #999; text-align: center;">输入内容后将显示预览</p>';
+                    return;
+                }
+
+                try {
+                    let output;
+                    if (this.direction === 'md2html') {
+                        output = CodeUtils.markdownToHTML(input);
+                        this.preview.innerHTML = output;
+                    } else {
+                        output = CodeUtils.htmlToMarkdown(input);
+                        // 预览 Markdown 转换后的 HTML
+                        this.preview.innerHTML = CodeUtils.markdownToHTML(output);
+                    }
+                    
+                    this.outputEditor.value = output;
+                    this.inputEditor.classList.remove('error');
+                } catch (error) {
+                    this.inputEditor.classList.add('error');
+                    CodeUtils.showError('转换失败: ' + error.message);
+                }
+            }
+
+            download() {
+                const output = this.outputEditor.value;
+                if (!output) {
+                    CodeUtils.showWarning('没有可下载的内容');
+                    return;
+                }
+
+                const ext = this.direction === 'md2html' ? 'html' : 'md';
+                const filename = CodeUtils.generateFilename('converted', ext);
+                this.fileHandler.downloadFile(output, filename);
+                CodeUtils.showSuccess('文件下载成功');
+            }
+
+            _clearAll() {
+                this.inputEditor.value = '';
+                this.outputEditor.value = '';
+                this.preview.innerHTML = '<p style="color: #999; text-align: center;">输入内容后将显示预览</p>';
+                this.inputEditor.classList.remove('error');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new MarkdownHTMLTool();
+        });
+    </script>
+</body>
+</html>

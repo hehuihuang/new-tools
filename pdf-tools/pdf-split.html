@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF 拆分 - PDF 工具套件</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <link rel="stylesheet" href="./shared/styles.css">
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>PDF 拆分</h1>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card" id="upload-section">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">📄</div>
+                <h3>点击或拖拽上传 PDF 文件</h3>
+                <p>支持最大 50MB 的 PDF 文件</p>
+            </div>
+        </div>
+
+        <div class="card" id="split-section" style="display: none;">
+            <h3>文件信息</h3>
+            <p id="file-info"></p>
+            
+            <h3 style="margin-top: 20px;">页面范围</h3>
+            <p>输入要提取的页面范围，例如: 1-3, 5, 7-9</p>
+            <input type="text" id="page-range" placeholder="1-3, 5, 7-9" style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px;">
+            
+            <button class="btn btn-primary" id="split-btn" style="margin-top: 10px;">提取页面</button>
+        </div>
+    </div>
+
+    <script>
+        class PDFSplitTool {
+            constructor() {
+                this.uploader = new FileUploader({ multiple: false });
+                this.progress = new ProgressIndicator();
+                this.pdfDoc = null;
+                this.pdfBytes = null;
+                
+                this._initElements();
+                this._bindEvents();
+            }
+
+            _initElements() {
+                this.uploadArea = document.getElementById('upload-area');
+                this.uploadSection = document.getElementById('upload-section');
+                this.splitSection = document.getElementById('split-section');
+                this.fileInfo = document.getElementById('file-info');
+                this.pageRangeInput = document.getElementById('page-range');
+                this.splitBtn = document.getElementById('split-btn');
+            }
+
+            _bindEvents() {
+                this.uploadArea.addEventListener('click', () => {
+                    this.uploader.selectFiles().then(files => {
+                        this.loadPDF(files[0]);
+                    }).catch(err => {});
+                });
+
+                this.uploader.setupDropZone(this.uploadArea, (files) => {
+                    this.loadPDF(files[0]);
+                });
+
+                this.splitBtn.addEventListener('click', () => {
+                    this.extractPages();
+                });
+            }
+
+            async loadPDF(file) {
+                try {
+                    this.progress.show('加载 PDF 文件...');
+                    
+                    this.pdfBytes = await this.uploader.readAsArrayBuffer(file);
+                    this.pdfDoc = await PDFLib.PDFDocument.load(this.pdfBytes);
+                    
+                    const numPages = this.pdfDoc.getPageCount();
+                    this.fileInfo.textContent = `文件名: ${file.name} | 总页数: ${numPages} 页 | 大小: ${Utils.formatFileSize(file.size)}`;
+                    
+                    this.uploadSection.style.display = 'none';
+                    this.splitSection.style.display = 'block';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('PDF 加载成功！');
+                    
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('PDF 加载失败: ' + error.message);
+                }
+            }
+
+            async extractPages() {
+                try {
+                    const rangeStr = this.pageRangeInput.value.trim();
+                    if (!rangeStr) {
+                        Utils.showError('请输入页面范围');
+                        return;
+                    }
+                    
+                    const totalPages = this.pdfDoc.getPageCount();
+                    const pageNumbers = Utils.parsePageRange(rangeStr, totalPages);
+                    
+                    this.progress.show('提取页面...');
+                    
+                    const newPdf = await PDFLib.PDFDocument.create();
+                    const copiedPages = await newPdf.copyPages(this.pdfDoc, pageNumbers.map(n => n - 1));
+                    copiedPages.forEach(page => newPdf.addPage(page));
+                    
+                    const pdfBytes = await newPdf.save();
+                    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                    
+                    Utils.downloadFile(blob, 'extracted.pdf');
+                    
+                    this.progress.hide();
+                    Utils.showSuccess(`成功提取 ${pageNumbers.length} 页！`);
+                    
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError(error.message || 'PDF 拆分失败');
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new PDFSplitTool();
+        });
+    </script>
+</body>
+</html>

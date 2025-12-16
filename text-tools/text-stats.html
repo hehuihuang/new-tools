@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文本统计 - 在线工具箱</title>
+  <link rel="stylesheet" href="shared/styles.css">
+  <style>
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+    .stat-card {
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #2196F3;
+      margin: 10px 0;
+    }
+    .stat-label {
+      font-size: 14px;
+      color: #666;
+    }
+    .freq-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      max-height: 300px;
+      overflow-y: auto;
+      display: block;
+    }
+    .freq-table thead {
+      position: sticky;
+      top: 0;
+      background: #fff;
+    }
+    .freq-table th,
+    .freq-table td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+    .freq-table th {
+      background: #2196F3;
+      color: white;
+      font-weight: 500;
+    }
+    .freq-table tr:hover {
+      background: #f5f5f5;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+      <h1>文本统计工具</h1>
+      <p>实时统计字数、单词、句子、行数和字符频率</p>
+      <div class="privacy-notice">🔒 所有处理均在本地完成，数据不会上传</div>
+    </header>
+
+    <div class="card">
+      <div class="card-title">输入文本</div>
+      <div class="editor-container">
+        <textarea id="input" class="editor" placeholder="在此输入或粘贴文本，统计信息将实时更新..." oninput="updateStatistics()"></textarea>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-secondary" onclick="clearInput()">清空</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">统计信息</div>
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+          <div class="stat-label">字符数（含空格）</div>
+          <div class="stat-value" id="charCount">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">字符数（不含空格）</div>
+          <div class="stat-value" id="charCountNoSpace">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">单词数</div>
+          <div class="stat-value" id="wordCount">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">句子数</div>
+          <div class="stat-value" id="sentenceCount">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">行数</div>
+          <div class="stat-value" id="lineCount">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">字符频率分析</div>
+      <div style="overflow-x: auto;">
+        <table class="freq-table" id="freqTable">
+          <thead>
+            <tr>
+              <th>字符</th>
+              <th>出现次数</th>
+              <th>占比</th>
+            </tr>
+          </thead>
+          <tbody id="freqTableBody">
+            <tr>
+              <td colspan="3" style="text-align: center; color: #999;">输入文本后显示字符频率</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { showMessage } from './shared/components.js';
+
+    window.showMessage = showMessage;
+
+    /**
+     * 计算统计信息
+     */
+    function calculateStats(text) {
+      if (!text) {
+        return {
+          charCount: 0,
+          charCountNoSpace: 0,
+          wordCount: 0,
+          sentenceCount: 0,
+          lineCount: 0,
+          charFrequency: new Map()
+        };
+      }
+
+      // 字符数
+      const charCount = text.length;
+      const charCountNoSpace = text.replace(/\s/g, '').length;
+
+      // 单词数
+      const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+      const wordCount = words.length;
+
+      // 句子数（基于句号、问号、感叹号）
+      const sentences = text.split(/[.!?。！？]+/).filter(s => s.trim().length > 0);
+      const sentenceCount = sentences.length;
+
+      // 行数
+      const lines = text.split(/\r?\n/);
+      const lineCount = lines.length;
+
+      // 字符频率
+      const charFrequency = getCharFrequency(text);
+
+      return {
+        charCount,
+        charCountNoSpace,
+        wordCount,
+        sentenceCount,
+        lineCount,
+        charFrequency
+      };
+    }
+
+    /**
+     * 获取字符频率
+     */
+    function getCharFrequency(text) {
+      const frequency = new Map();
+      
+      for (const char of text) {
+        frequency.set(char, (frequency.get(char) || 0) + 1);
+      }
+      
+      return frequency;
+    }
+
+    /**
+     * 更新统计信息
+     */
+    window.updateStatistics = function() {
+      const input = document.getElementById('input').value;
+      const stats = calculateStats(input);
+
+      // 更新统计卡片
+      document.getElementById('charCount').textContent = stats.charCount;
+      document.getElementById('charCountNoSpace').textContent = stats.charCountNoSpace;
+      document.getElementById('wordCount').textContent = stats.wordCount;
+      document.getElementById('sentenceCount').textContent = stats.sentenceCount;
+      document.getElementById('lineCount').textContent = stats.lineCount;
+
+      // 更新字符频率表
+      updateFrequencyTable(stats.charFrequency, stats.charCount);
+    };
+
+    /**
+     * 更新字符频率表
+     */
+    function updateFrequencyTable(frequency, total) {
+      const tbody = document.getElementById('freqTableBody');
+      
+      if (frequency.size === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #999;">输入文本后显示字符频率</td></tr>';
+        return;
+      }
+
+      // 转换为数组并排序
+      const sortedFreq = Array.from(frequency.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 50); // 只显示前50个
+
+      tbody.innerHTML = sortedFreq.map(([char, count]) => {
+        const percentage = ((count / total) * 100).toFixed(2);
+        const displayChar = char === ' ' ? '空格' : char === '\n' ? '换行' : char === '\t' ? '制表符' : char;
+        return `
+          <tr>
+            <td><code>${displayChar}</code></td>
+            <td>${count}</td>
+            <td>${percentage}%</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    window.clearInput = function() {
+      document.getElementById('input').value = '';
+      updateStatistics();
+    };
+
+    // 导出供测试使用
+    window.calculateStats = calculateStats;
+    window.getCharFrequency = getCharFrequency;
+  </script>
+</body>
+</html>

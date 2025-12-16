@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON 格式化/压缩/校验 - 代码工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>JSON 格式化 / 压缩 / 校验</h1>
+            <p>支持 JSON 自动美化、压缩、校验结构是否合法</p>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card">
+            <div class="editor-container">
+                <label class="editor-label">输入 JSON 数据</label>
+                <textarea id="input-editor" class="editor" placeholder="在此输入或粘贴 JSON 数据..."></textarea>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" id="format-btn">格式化</button>
+                <button class="btn btn-primary" id="compress-btn">压缩</button>
+                <button class="btn btn-success" id="validate-btn">校验</button>
+                <button class="btn btn-secondary" id="upload-btn">上传文件</button>
+                <button class="btn btn-danger" id="clear-btn">清空</button>
+            </div>
+        </div>
+
+        <!-- 校验结果 -->
+        <div class="card" id="validation-result" style="display: none;">
+            <h3 class="card-title">校验结果</h3>
+            <div id="validation-content"></div>
+        </div>
+
+        <!-- 输出区域 -->
+        <div class="card" id="output-section" style="display: none;">
+            <div class="editor-container">
+                <label class="editor-label">输出结果</label>
+                <textarea id="output-editor" class="editor" readonly></textarea>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-secondary" id="copy-btn">复制到剪贴板</button>
+                <button class="btn btn-secondary" id="download-btn">下载文件</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+    <script>
+        class JSONTool {
+            constructor() {
+                this.inputEditor = document.getElementById('input-editor');
+                this.outputEditor = document.getElementById('output-editor');
+                this.outputSection = document.getElementById('output-section');
+                this.validationResult = document.getElementById('validation-result');
+                this.validationContent = document.getElementById('validation-content');
+                this.fileHandler = new FileHandler();
+                
+                this._bindEvents();
+            }
+
+            _bindEvents() {
+                document.getElementById('format-btn').addEventListener('click', () => this.format());
+                document.getElementById('compress-btn').addEventListener('click', () => this.compress());
+                document.getElementById('validate-btn').addEventListener('click', () => this.validate());
+                document.getElementById('upload-btn').addEventListener('click', () => this.upload());
+                document.getElementById('clear-btn').addEventListener('click', () => this.clear());
+                document.getElementById('copy-btn').addEventListener('click', () => this.copy());
+                document.getElementById('download-btn').addEventListener('click', () => this.download());
+
+                // 实时校验
+                this.inputEditor.addEventListener('input', () => {
+                    this.inputEditor.classList.remove('error');
+                    this.validationResult.style.display = 'none';
+                });
+            }
+
+            format() {
+                const input = this.inputEditor.value.trim();
+                if (!input) {
+                    CodeUtils.showWarning('请输入 JSON 数据');
+                    return;
+                }
+
+                try {
+                    const formatted = CodeUtils.formatJSON(input, 2);
+                    this.outputEditor.value = formatted;
+                    this.outputSection.style.display = 'block';
+                    this.inputEditor.classList.remove('error');
+                    CodeUtils.showSuccess('JSON 格式化成功');
+                } catch (error) {
+                    this.inputEditor.classList.add('error');
+                    this._showValidationError(error.message);
+                }
+            }
+
+            compress() {
+                const input = this.inputEditor.value.trim();
+                if (!input) {
+                    CodeUtils.showWarning('请输入 JSON 数据');
+                    return;
+                }
+
+                try {
+                    const compressed = CodeUtils.compressJSON(input);
+                    this.outputEditor.value = compressed;
+                    this.outputSection.style.display = 'block';
+                    this.inputEditor.classList.remove('error');
+                    
+                    const ratio = ((input.length - compressed.length) / input.length * 100).toFixed(1);
+                    CodeUtils.showSuccess(`JSON 压缩成功！减少了 ${ratio}% 的大小`);
+                } catch (error) {
+                    this.inputEditor.classList.add('error');
+                    this._showValidationError(error.message);
+                }
+            }
+
+            validate() {
+                const input = this.inputEditor.value.trim();
+                if (!input) {
+                    CodeUtils.showWarning('请输入 JSON 数据');
+                    return;
+                }
+
+                const result = CodeUtils.validateJSON(input);
+                this.validationResult.style.display = 'block';
+
+                if (result.valid) {
+                    this.inputEditor.classList.remove('error');
+                    this.validationContent.innerHTML = `
+                        <div style="color: #27ae60; margin-bottom: 15px;">
+                            <strong>✓ JSON 格式正确</strong>
+                        </div>
+                        <div class="stats">
+                            <div class="stat-item">
+                                <div class="stat-value">${result.stats.keys}</div>
+                                <div class="stat-label">键数量</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${result.stats.depth}</div>
+                                <div class="stat-label">嵌套深度</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${CodeUtils.formatFileSize(result.stats.size)}</div>
+                                <div class="stat-label">数据大小</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    this._showValidationError(result.error.message, result.error.line, result.error.column);
+                }
+            }
+
+            _showValidationError(message, line, column) {
+                this.inputEditor.classList.add('error');
+                this.validationResult.style.display = 'block';
+                
+                let errorInfo = `<div style="color: #e74c3c;"><strong>✗ JSON 格式错误</strong></div>`;
+                errorInfo += `<p style="margin-top: 10px;">${message}</p>`;
+                
+                if (line && column) {
+                    errorInfo += `<p style="color: #666;">位置: 第 ${line} 行, 第 ${column} 列</p>`;
+                }
+                
+                this.validationContent.innerHTML = errorInfo;
+                CodeUtils.showError('JSON 格式错误');
+            }
+
+            async upload() {
+                try {
+                    const file = await this.fileHandler.uploadFile(['.json', '.txt']);
+                    const content = await this.fileHandler.readAsText(file);
+                    this.inputEditor.value = content;
+                    CodeUtils.showSuccess('文件上传成功');
+                } catch (error) {
+                    if (error.message !== '未选择文件') {
+                        CodeUtils.showError(error.message);
+                    }
+                }
+            }
+
+            clear() {
+                this.inputEditor.value = '';
+                this.outputEditor.value = '';
+                this.outputSection.style.display = 'none';
+                this.validationResult.style.display = 'none';
+                this.inputEditor.classList.remove('error');
+            }
+
+            async copy() {
+                const output = this.outputEditor.value;
+                if (!output) {
+                    CodeUtils.showWarning('没有可复制的内容');
+                    return;
+                }
+                await this.fileHandler.copyToClipboard(output);
+            }
+
+            download() {
+                const output = this.outputEditor.value;
+                if (!output) {
+                    CodeUtils.showWarning('没有可下载的内容');
+                    return;
+                }
+                const filename = CodeUtils.generateFilename('json', 'json');
+                this.fileHandler.downloadFile(output, filename, 'application/json');
+                CodeUtils.showSuccess('文件下载成功');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new JSONTool();
+        });
+    </script>
+</body>
+</html>

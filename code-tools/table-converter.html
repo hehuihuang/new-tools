@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown 表格/CSV 转换 - 代码工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>Markdown 表格 / CSV 转换</h1>
+            <p>将 CSV 转成 Markdown 表格，或反向生成 CSV，提高文档处理效率</p>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <!-- 标签页 -->
+        <div class="card">
+            <div class="tabs">
+                <button class="tab active" data-tab="csv2md">CSV → Markdown</button>
+                <button class="tab" data-tab="md2csv">Markdown → CSV</button>
+                <button class="tab" data-tab="editor">可视化编辑器</button>
+            </div>
+
+            <!-- CSV 转 Markdown -->
+            <div id="csv2md" class="tab-content active">
+                <div class="editor-container">
+                    <label class="editor-label">输入 CSV 数据</label>
+                    <textarea id="csv-input" class="editor" placeholder="姓名,年龄,城市&#10;张三,25,北京&#10;李四,30,上海&#10;王五,28,广州"></textarea>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="csv2md-btn">转换为 Markdown</button>
+                    <button class="btn btn-danger" id="clear-csv-btn">清空</button>
+                </div>
+            </div>
+
+            <!-- Markdown 转 CSV -->
+            <div id="md2csv" class="tab-content">
+                <div class="editor-container">
+                    <label class="editor-label">输入 Markdown 表格</label>
+                    <textarea id="md-input" class="editor" placeholder="| 姓名 | 年龄 | 城市 |&#10;| --- | --- | --- |&#10;| 张三 | 25 | 北京 |&#10;| 李四 | 30 | 上海 |"></textarea>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="md2csv-btn">转换为 CSV</button>
+                    <button class="btn btn-danger" id="clear-md-btn">清空</button>
+                </div>
+            </div>
+
+            <!-- 可视化编辑器 -->
+            <div id="editor" class="tab-content">
+                <div id="table-editor"></div>
+                <div class="btn-group" style="margin-top: 15px;">
+                    <button class="btn btn-primary" id="generate-md-btn">生成 Markdown</button>
+                    <button class="btn btn-primary" id="generate-csv-btn">生成 CSV</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 输出区域 -->
+        <div class="card" id="output-section" style="display: none;">
+            <h3 class="card-title">输出结果</h3>
+            <div class="editor-container">
+                <textarea id="output-editor" class="editor" readonly></textarea>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-secondary" id="copy-btn">复制到剪贴板</button>
+                <button class="btn btn-secondary" id="download-btn">下载文件</button>
+            </div>
+        </div>
+
+        <!-- Markdown 预览 -->
+        <div class="card" id="preview-section" style="display: none;">
+            <h3 class="card-title">表格预览</h3>
+            <div id="table-preview" class="preview"></div>
+        </div>
+    </div>
+
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+    <script>
+        class TableConverterTool {
+            constructor() {
+                this.outputEditor = document.getElementById('output-editor');
+                this.outputSection = document.getElementById('output-section');
+                this.previewSection = document.getElementById('preview-section');
+                this.tablePreview = document.getElementById('table-preview');
+                this.fileHandler = new FileHandler();
+                this.editableTable = null;
+                this.currentOutputType = 'md';
+                
+                this._bindEvents();
+                this._initEditor();
+            }
+
+            _bindEvents() {
+                // 标签页切换
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                        e.target.classList.add('active');
+                        document.getElementById(e.target.dataset.tab).classList.add('active');
+                    });
+                });
+
+                // CSV 转 Markdown
+                document.getElementById('csv2md-btn').addEventListener('click', () => this.csvToMarkdown());
+                document.getElementById('clear-csv-btn').addEventListener('click', () => {
+                    document.getElementById('csv-input').value = '';
+                    this.hideOutput();
+                });
+
+                // Markdown 转 CSV
+                document.getElementById('md2csv-btn').addEventListener('click', () => this.markdownToCSV());
+                document.getElementById('clear-md-btn').addEventListener('click', () => {
+                    document.getElementById('md-input').value = '';
+                    this.hideOutput();
+                });
+
+                // 可视化编辑器
+                document.getElementById('generate-md-btn').addEventListener('click', () => this.generateFromEditor('md'));
+                document.getElementById('generate-csv-btn').addEventListener('click', () => this.generateFromEditor('csv'));
+
+                // 复制和下载
+                document.getElementById('copy-btn').addEventListener('click', () => this.copy());
+                document.getElementById('download-btn').addEventListener('click', () => this.download());
+            }
+
+            _initEditor() {
+                this.editableTable = new EditableTable(document.getElementById('table-editor'), {
+                    rows: 4,
+                    cols: 3
+                });
+            }
+
+            csvToMarkdown() {
+                const csv = document.getElementById('csv-input').value.trim();
+                if (!csv) {
+                    CodeUtils.showWarning('请输入 CSV 数据');
+                    return;
+                }
+
+                try {
+                    const markdown = CodeUtils.csvToMarkdownTable(csv);
+                    this.showOutput(markdown, 'md');
+                    this.showPreview(markdown);
+                    CodeUtils.showSuccess('转换成功');
+                } catch (error) {
+                    CodeUtils.showError('转换失败: ' + error.message);
+                }
+            }
+
+            markdownToCSV() {
+                const markdown = document.getElementById('md-input').value.trim();
+                if (!markdown) {
+                    CodeUtils.showWarning('请输入 Markdown 表格');
+                    return;
+                }
+
+                try {
+                    const csv = CodeUtils.markdownTableToCSV(markdown);
+                    this.showOutput(csv, 'csv');
+                    this.previewSection.style.display = 'none';
+                    CodeUtils.showSuccess('转换成功');
+                } catch (error) {
+                    CodeUtils.showError('转换失败: ' + error.message);
+                }
+            }
+
+            generateFromEditor(type) {
+                const data = this.editableTable.getData();
+                
+                // 检查是否有数据
+                const hasData = data.some(row => row.some(cell => cell.trim()));
+                if (!hasData) {
+                    CodeUtils.showWarning('请在表格中输入数据');
+                    return;
+                }
+
+                if (type === 'md') {
+                    const markdown = this.editableTable.toMarkdown();
+                    this.showOutput(markdown, 'md');
+                    this.showPreview(markdown);
+                } else {
+                    const csv = this.editableTable.toCSV();
+                    this.showOutput(csv, 'csv');
+                    this.previewSection.style.display = 'none';
+                }
+                
+                CodeUtils.showSuccess('生成成功');
+            }
+
+            showOutput(content, type) {
+                this.outputEditor.value = content;
+                this.outputSection.style.display = 'block';
+                this.currentOutputType = type;
+            }
+
+            hideOutput() {
+                this.outputSection.style.display = 'none';
+                this.previewSection.style.display = 'none';
+            }
+
+            showPreview(markdown) {
+                // 将 Markdown 表格转换为 HTML 表格
+                const rows = markdown.trim().split('\n');
+                let html = '<table class="data-table">';
+                
+                rows.forEach((row, index) => {
+                    // 跳过分隔行
+                    if (/^\|[\s-:|]+\|$/.test(row)) return;
+                    
+                    const cells = row.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+                    const tag = index === 0 ? 'th' : 'td';
+                    
+                    html += '<tr>';
+                    cells.forEach(cell => {
+                        html += `<${tag}>${cell}</${tag}>`;
+                    });
+                    html += '</tr>';
+                });
+                
+                html += '</table>';
+                this.tablePreview.innerHTML = html;
+                this.previewSection.style.display = 'block';
+            }
+
+            async copy() {
+                const output = this.outputEditor.value;
+                if (!output) {
+                    CodeUtils.showWarning('没有可复制的内容');
+                    return;
+                }
+                await this.fileHandler.copyToClipboard(output);
+            }
+
+            download() {
+                const output = this.outputEditor.value;
+                if (!output) {
+                    CodeUtils.showWarning('没有可下载的内容');
+                    return;
+                }
+                
+                const ext = this.currentOutputType === 'md' ? 'md' : 'csv';
+                const mimeType = this.currentOutputType === 'md' ? 'text/markdown' : 'text/csv';
+                const filename = CodeUtils.generateFilename('table', ext);
+                this.fileHandler.downloadFile(output, filename, mimeType);
+                CodeUtils.showSuccess('文件下载成功');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new TableConverterTool();
+        });
+    </script>
+</body>
+</html>

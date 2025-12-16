@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文本清理 - 在线工具箱</title>
+  <link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+      <h1>文本清理工具</h1>
+      <p>去除多余空格、特殊字符、HTML标签，快速清理文本格式</p>
+      <div class="privacy-notice">🔒 所有处理均在本地完成，数据不会上传</div>
+    </header>
+
+    <div class="card">
+      <div class="card-title">清理选项</div>
+      <div style="display: grid; gap: 10px;">
+        <label style="display: flex; align-items: center; gap: 8px;">
+          <input type="checkbox" id="opt-trim" checked>
+          <span>去除首尾空格</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px;">
+          <input type="checkbox" id="opt-collapse" checked>
+          <span>去除多余空格（合并连续空格）</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px;">
+          <input type="checkbox" id="opt-special">
+          <span>去除特殊字符（保留字母数字和常用标点）</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px;">
+          <input type="checkbox" id="opt-html">
+          <span>去除HTML标签</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="dual-editor">
+      <div class="card">
+        <div class="card-title">输入文本</div>
+        <div class="editor-container">
+          <textarea id="input" class="editor" placeholder="在此输入或粘贴文本..."></textarea>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="cleanText()">清理</button>
+          <button class="btn btn-secondary" onclick="clearInput()">清空</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">清理结果</div>
+        <div class="editor-container">
+          <textarea id="output" class="editor" readonly placeholder="清理结果将显示在这里..."></textarea>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-success" onclick="copyResult()">复制结果</button>
+        </div>
+        <div id="stats" class="stats"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { showMessage, copyToClipboard, updateStats } from './shared/components.js';
+
+    window.showMessage = showMessage;
+    window.copyToClipboard = copyToClipboard;
+    window.updateStats = updateStats;
+
+    /**
+     * 去除首尾空格
+     */
+    function trimLines(text) {
+      return text.split(/\r?\n/).map(line => line.trim()).join('\n');
+    }
+
+    /**
+     * 合并多余空格
+     */
+    function collapseSpaces(text) {
+      return text.replace(/ {2,}/g, ' ');
+    }
+
+    /**
+     * 去除特殊字符
+     */
+    function removeSpecialChars(text) {
+      // 保留字母、数字、中文、常用标点和空白字符
+      return text.replace(/[^\w\s\u4e00-\u9fa5.,!?;:'"()\-]/g, '');
+    }
+
+    /**
+     * 去除HTML标签
+     */
+    function stripHtmlTags(text) {
+      return text.replace(/<[^>]+>/g, '');
+    }
+
+    /**
+     * 清理文本
+     */
+    window.cleanText = function() {
+      const input = document.getElementById('input').value;
+      
+      if (!input.trim()) {
+        showMessage('error', '请输入要清理的文本');
+        return;
+      }
+      
+      let result = input;
+      const operations = [];
+      
+      // 按顺序应用清理操作
+      if (document.getElementById('opt-html').checked) {
+        result = stripHtmlTags(result);
+        operations.push('去除HTML标签');
+      }
+      
+      if (document.getElementById('opt-special').checked) {
+        result = removeSpecialChars(result);
+        operations.push('去除特殊字符');
+      }
+      
+      if (document.getElementById('opt-collapse').checked) {
+        result = collapseSpaces(result);
+        operations.push('合并空格');
+      }
+      
+      if (document.getElementById('opt-trim').checked) {
+        result = trimLines(result);
+        operations.push('去除首尾空格');
+      }
+      
+      if (operations.length === 0) {
+        showMessage('error', '请至少选择一个清理选项');
+        return;
+      }
+      
+      document.getElementById('output').value = result;
+      updateStats({
+        '原始长度': input.length,
+        '清理后长度': result.length,
+        '减少字符': input.length - result.length,
+        '应用操作': operations.join('、')
+      }, document.getElementById('stats'));
+      
+      showMessage('success', '清理完成');
+    };
+
+    window.clearInput = function() {
+      document.getElementById('input').value = '';
+      document.getElementById('output').value = '';
+      document.getElementById('stats').innerHTML = '';
+    };
+
+    window.copyResult = function() {
+      const output = document.getElementById('output').value;
+      if (!output) {
+        showMessage('error', '没有可复制的内容');
+        return;
+      }
+      copyToClipboard(output);
+    };
+
+    // 导出供测试使用
+    window.trimLines = trimLines;
+    window.collapseSpaces = collapseSpaces;
+    window.removeSpecialChars = removeSpecialChars;
+    window.stripHtmlTags = stripHtmlTags;
+  </script>
+</body>
+</html>

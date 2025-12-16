@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF 页面重排 - PDF 工具套件</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <link rel="stylesheet" href="./shared/styles.css">
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+    
+    <style>
+        .thumbnail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; margin-top: 20px; }
+        .thumbnail-item { border: 2px solid #ddd; border-radius: 4px; padding: 10px; text-align: center; cursor: move; position: relative; }
+        .thumbnail-item.selected { border-color: #4a90e2; background: #e3f2fd; }
+        .thumbnail-item canvas { width: 100%; border: 1px solid #eee; }
+        .thumbnail-item .page-num { margin-top: 5px; font-size: 14px; }
+        .thumbnail-item .delete-btn { position: absolute; top: 5px; right: 5px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 25px; height: 25px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>PDF 页面删除与重排</h1>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card" id="upload-section">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">📄</div>
+                <h3>点击或拖拽上传 PDF 文件</h3>
+                <p>支持最大 50MB 的 PDF 文件</p>
+            </div>
+        </div>
+
+        <div class="card" id="reorder-section" style="display: none;">
+            <p>拖拽页面重新排序，点击删除按钮移除页面</p>
+            <div class="thumbnail-grid" id="thumbnail-grid"></div>
+            <button class="btn btn-primary" id="save-btn" style="margin-top: 20px;">保存 PDF</button>
+        </div>
+    </div>
+
+    <script>
+        class PDFReorderTool {
+            constructor() {
+                this.uploader = new FileUploader({ multiple: false });
+                this.progress = new ProgressIndicator();
+                this.pdfDoc = null;
+                this.pages = [];
+                
+                this._initElements();
+                this._bindEvents();
+            }
+
+            _initElements() {
+                this.uploadArea = document.getElementById('upload-area');
+                this.uploadSection = document.getElementById('upload-section');
+                this.reorderSection = document.getElementById('reorder-section');
+                this.thumbnailGrid = document.getElementById('thumbnail-grid');
+                this.saveBtn = document.getElementById('save-btn');
+            }
+
+            _bindEvents() {
+                this.uploadArea.addEventListener('click', () => {
+                    this.uploader.selectFiles().then(files => {
+                        this.loadPages(files[0]);
+                    }).catch(err => {});
+                });
+
+                this.uploader.setupDropZone(this.uploadArea, (files) => {
+                    this.loadPages(files[0]);
+                });
+
+                this.saveBtn.addEventListener('click', () => {
+                    this.generatePDF();
+                });
+            }
+
+            async loadPages(file) {
+                try {
+                    this.progress.show('加载 PDF 页面...');
+                    
+                    const arrayBuffer = await this.uploader.readAsArrayBuffer(file);
+                    this.pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+                    
+                    const numPages = this.pdfDoc.getPageCount();
+                    this.pages = Array.from({ length: numPages }, (_, i) => i);
+                    
+                    await this._renderThumbnails(arrayBuffer);
+                    
+                    this.uploadSection.style.display = 'none';
+                    this.reorderSection.style.display = 'block';
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('PDF 加载成功！');
+                    
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('PDF 加载失败: ' + error.message);
+                }
+            }
+
+            async _renderThumbnails(arrayBuffer) {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                
+                this.thumbnailGrid.innerHTML = '';
+                
+                for (let i = 0; i < this.pages.length; i++) {
+                    const pageNum = this.pages[i] + 1;
+                    const page = await pdf.getPage(pageNum);
+                    const viewport = page.getViewport({ scale: 0.3 });
+                    
+                    const canvas = document.createElement('canvas');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    
+                    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                    
+                    const div = document.createElement('div');
+                    div.className = 'thumbnail-item';
+                    div.draggable = true;
+                    div.dataset.index = i;
+                    div.innerHTML = `
+                        <button class="delete-btn" onclick="tool.deletePage(${i})">×</button>
+                        <div class="page-num">第 ${pageNum} 页</div>
+                    `;
+                    div.insertBefore(canvas, div.firstChild);
+                    
+                    this.thumbnailGrid.appendChild(div);
+                }
+            }
+
+            deletePage(index) {
+                if (this.pages.length <= 1) {
+                    Utils.showError('无法删除所有页面，请至少保留一页');
+                    return;
+                }
+                
+                this.pages.splice(index, 1);
+                this.thumbnailGrid.children[index].remove();
+                
+                // 更新索引
+                Array.from(this.thumbnailGrid.children).forEach((child, i) => {
+                    child.dataset.index = i;
+                    child.querySelector('.delete-btn').setAttribute('onclick', `tool.deletePage(${i})`);
+                });
+            }
+
+            async generatePDF() {
+                try {
+                    if (this.pages.length === 0) {
+                        Utils.showError('无法保存空文档');
+                        return;
+                    }
+                    
+                    this.progress.show('生成 PDF...');
+                    
+                    const newPdf = await PDFLib.PDFDocument.create();
+                    const copiedPages = await newPdf.copyPages(this.pdfDoc, this.pages);
+                    copiedPages.forEach(page => newPdf.addPage(page));
+                    
+                    const pdfBytes = await newPdf.save();
+                    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                    
+                    Utils.downloadFile(blob, 'reordered.pdf');
+                    
+                    this.progress.hide();
+                    Utils.showSuccess('PDF 保存成功！');
+                    
+                } catch (error) {
+                    this.progress.hide();
+                    Utils.showError('PDF 保存失败: ' + error.message);
+                }
+            }
+        }
+
+        let tool;
+        document.addEventListener('DOMContentLoaded', () => {
+            tool = new PDFReorderTool();
+        });
+    </script>
+</body>
+</html>

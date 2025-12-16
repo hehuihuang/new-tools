@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>链接调试工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 30px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        h2 { color: #4a90e2; margin-top: 0; }
+        .link-item {
+            padding: 15px;
+            margin: 10px 0;
+            background: #f9f9f9;
+            border-left: 4px solid #4a90e2;
+            border-radius: 4px;
+        }
+        .link-item a {
+            color: #4a90e2;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .link-item a:hover {
+            text-decoration: underline;
+        }
+        .path {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+            font-family: monospace;
+        }
+        .status {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .status.checking { background: #fff3cd; color: #856404; }
+        .status.ok { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        button {
+            background: #4a90e2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #357abd; }
+        .info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .console {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .console-line {
+            margin: 5px 0;
+        }
+        .console-error {
+            color: #f48771;
+        }
+        .console-success {
+            color: #89d185;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 PDF 工具链接调试</h1>
+
+    <div class="card">
+        <h2>当前环境信息</h2>
+        <div class="info">
+            <strong>当前 URL:</strong> <code id="current-url"></code><br>
+            <strong>协议:</strong> <code id="protocol"></code><br>
+            <strong>基础路径:</strong> <code id="base-path"></code>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>PDF 工具链接测试</h2>
+        <p>点击下面的链接，观察是否能正常打开：</p>
+        <button onclick="testAllLinks()">测试所有链接</button>
+        <button onclick="clearConsole()">清除日志</button>
+        
+        <div id="links-container"></div>
+        
+        <h3>控制台日志:</h3>
+        <div class="console" id="console"></div>
+    </div>
+
+    <div class="card">
+        <h2>手动测试</h2>
+        <p>如果自动测试失败，请手动点击下面的链接：</p>
+        <div id="manual-links"></div>
+    </div>
+
+    <script>
+        const links = [
+            { name: 'PDF 在线预览', path: 'pdf-tools/pdf-preview.html' },
+            { name: 'PDF 合并', path: 'pdf-tools/pdf-merge.html' },
+            { name: 'PDF 拆分', path: 'pdf-tools/pdf-split.html' },
+            { name: 'PDF 重排', path: 'pdf-tools/pdf-reorder.html' },
+            { name: 'PDF 水印', path: 'pdf-tools/pdf-watermark.html' },
+            { name: 'PDF 批注', path: 'pdf-tools/pdf-annotate.html' },
+            { name: 'PDF 转图片', path: 'pdf-tools/pdf-to-image.html' },
+            { name: 'PDF 压缩', path: 'pdf-tools/pdf-compress.html' }
+        ];
+
+        // 显示环境信息
+        document.getElementById('current-url').textContent = window.location.href;
+        document.getElementById('protocol').textContent = window.location.protocol;
+        document.getElementById('base-path').textContent = window.location.origin + window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
+
+        // 日志函数
+        function log(message, type = 'info') {
+            const console = document.getElementById('console');
+            const line = document.createElement('div');
+            line.className = 'console-line';
+            if (type === 'error') line.classList.add('console-error');
+            if (type === 'success') line.classList.add('console-success');
+            
+            const timestamp = new Date().toLocaleTimeString();
+            line.textContent = `[${timestamp}] ${message}`;
+            console.appendChild(line);
+            console.scrollTop = console.scrollHeight;
+        }
+
+        function clearConsole() {
+            document.getElementById('console').innerHTML = '';
+        }
+
+        // 渲染链接列表
+        function renderLinks() {
+            const container = document.getElementById('links-container');
+            const manualContainer = document.getElementById('manual-links');
+            
+            links.forEach((link, index) => {
+                // 自动测试区域
+                const div = document.createElement('div');
+                div.className = 'link-item';
+                div.id = `link-${index}`;
+                div.innerHTML = `
+                    <a href="${link.path}" target="_blank" onclick="logClick('${link.name}', '${link.path}')">${link.name}</a>
+                    <span class="status checking" id="status-${index}">未测试</span>
+                    <div class="path">路径: ${link.path}</div>
+                    <div class="path">完整 URL: <span id="full-url-${index}"></span></div>
+                `;
+                container.appendChild(div);
+                
+                // 计算完整 URL
+                const fullUrl = new URL(link.path, window.location.href).href;
+                document.getElementById(`full-url-${index}`).textContent = fullUrl;
+                
+                // 手动测试区域
+                const manualDiv = document.createElement('div');
+                manualDiv.className = 'link-item';
+                manualDiv.innerHTML = `
+                    <a href="${link.path}" target="_blank" onclick="logClick('${link.name}', '${link.path}')">${link.name}</a>
+                `;
+                manualContainer.appendChild(manualDiv);
+            });
+        }
+
+        // 记录点击
+        function logClick(name, path) {
+            log(`点击链接: ${name} (${path})`, 'info');
+        }
+
+        // 测试所有链接
+        async function testAllLinks() {
+            log('开始测试所有链接...', 'info');
+            
+            for (let i = 0; i < links.length; i++) {
+                const link = links[i];
+                const statusEl = document.getElementById(`status-${i}`);
+                
+                statusEl.textContent = '测试中...';
+                statusEl.className = 'status checking';
+                
+                try {
+                    log(`测试: ${link.name} (${link.path})`, 'info');
+                    
+                    const response = await fetch(link.path, { 
+                        method: 'HEAD',
+                        cache: 'no-cache'
+                    });
+                    
+                    if (response.ok) {
+                        statusEl.textContent = '✅ 可访问';
+                        statusEl.className = 'status ok';
+                        log(`✅ ${link.name} - 成功 (${response.status})`, 'success');
+                    } else {
+                        statusEl.textContent = `❌ 错误 ${response.status}`;
+                        statusEl.className = 'status error';
+                        log(`❌ ${link.name} - 失败 (${response.status})`, 'error');
+                    }
+                } catch (error) {
+                    statusEl.textContent = '❌ 无法访问';
+                    statusEl.className = 'status error';
+                    log(`❌ ${link.name} - 错误: ${error.message}`, 'error');
+                }
+                
+                // 稍微延迟，避免请求过快
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            log('测试完成！', 'success');
+        }
+
+        // 页面加载时渲染链接
+        renderLinks();
+        log('页面加载完成，准备测试', 'success');
+    </script>
+</body>
+</html>

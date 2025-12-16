@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文本去重 - 在线工具箱</title>
+  <link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+      <h1>文本去重工具</h1>
+      <p>根据需求删除重复行、空行或重复单词，提高文本整洁度</p>
+      <div class="privacy-notice">🔒 所有处理均在本地完成，数据不会上传</div>
+    </header>
+
+    <div class="card">
+      <div class="card-title">去重模式</div>
+      <div class="options-group">
+        <div class="option-item">
+          <input type="radio" name="mode" id="mode-lines" value="lines" checked>
+          <label for="mode-lines">行去重</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" name="mode" id="mode-empty" value="empty">
+          <label for="mode-empty">去空行</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" name="mode" id="mode-words" value="words">
+          <label for="mode-words">去重复词</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="dual-editor">
+      <div class="card">
+        <div class="card-title">输入文本</div>
+        <div class="editor-container">
+          <textarea id="input" class="editor" placeholder="在此输入或粘贴文本..."></textarea>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="processText()">去重处理</button>
+          <button class="btn btn-secondary" onclick="clearInput()">清空</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">处理结果</div>
+        <div class="editor-container">
+          <textarea id="output" class="editor" readonly placeholder="处理结果将显示在这里..."></textarea>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-success" onclick="copyResult()">复制结果</button>
+        </div>
+        <div id="stats" class="stats"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="shared/components.js"></script>
+  <script src="shared/utils.js"></script>
+  <script>
+    /**
+     * 行去重 - 移除重复行，保留首次出现
+     * @param {string} text - 输入文本
+     * @returns {Object} { result: string, original: number, removed: number }
+     */
+    function dedupLines(text) {
+      const lines = splitLines(text);
+      const seen = new Set();
+      const result = [];
+      
+      for (const line of lines) {
+        if (!seen.has(line)) {
+          seen.add(line);
+          result.push(line);
+        }
+      }
+      
+      return {
+        result: joinLines(result),
+        original: lines.length,
+        removed: lines.length - result.length
+      };
+    }
+
+    /**
+     * 去空行 - 移除空行和仅含空白字符的行
+     * @param {string} text - 输入文本
+     * @returns {Object} { result: string, original: number, removed: number }
+     */
+    function removeEmptyLines(text) {
+      const lines = splitLines(text);
+      const result = lines.filter(line => line.trim().length > 0);
+      
+      return {
+        result: joinLines(result),
+        original: lines.length,
+        removed: lines.length - result.length
+      };
+    }
+
+    /**
+     * 去重复词 - 移除每行中的重复单词
+     * @param {string} text - 输入文本
+     * @returns {Object} { result: string, original: number, removed: number }
+     */
+    function dedupWords(text) {
+      const lines = splitLines(text);
+      let totalOriginal = 0;
+      let totalRemoved = 0;
+      
+      const result = lines.map(line => {
+        const words = line.split(/\s+/).filter(w => w.length > 0);
+        totalOriginal += words.length;
+        
+        const seen = new Set();
+        const uniqueWords = [];
+        
+        for (const word of words) {
+          if (!seen.has(word)) {
+            seen.add(word);
+            uniqueWords.push(word);
+          }
+        }
+        
+        totalRemoved += words.length - uniqueWords.length;
+        return uniqueWords.join(' ');
+      });
+      
+      return {
+        result: joinLines(result),
+        original: totalOriginal,
+        removed: totalRemoved
+      };
+    }
+
+    /**
+     * 处理文本
+     */
+    function processText() {
+      const input = document.getElementById('input').value;
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      
+      if (!input.trim()) {
+        showMessage('error', '请输入要处理的文本');
+        return;
+      }
+      
+      let result;
+      let label;
+      
+      switch (mode) {
+        case 'lines':
+          result = dedupLines(input);
+          label = '行';
+          break;
+        case 'empty':
+          result = removeEmptyLines(input);
+          label = '行';
+          break;
+        case 'words':
+          result = dedupWords(input);
+          label = '词';
+          break;
+      }
+      
+      document.getElementById('output').value = result.result;
+      updateStats({
+        [`原始${label}数`]: result.original,
+        [`移除${label}数`]: result.removed,
+        [`剩余${label}数`]: result.original - result.removed
+      }, document.getElementById('stats'));
+      
+      showMessage('success', '处理完成');
+    }
+
+    /**
+     * 清空输入
+     */
+    function clearInput() {
+      document.getElementById('input').value = '';
+      document.getElementById('output').value = '';
+      document.getElementById('stats').innerHTML = '';
+    }
+
+    /**
+     * 复制结果
+     */
+    function copyResult() {
+      const output = document.getElementById('output').value;
+      if (!output) {
+        showMessage('error', '没有可复制的内容');
+        return;
+      }
+      copyToClipboard(output);
+    }
+  </script>
+</body>
+</html>

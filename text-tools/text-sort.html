@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文本排序 - 在线工具箱</title>
+  <link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+      <h1>文本排序工具</h1>
+      <p>支持按字典序、数字、长度排序，可用于名单整理、数据预处理</p>
+      <div class="privacy-notice">🔒 所有处理均在本地完成，数据不会上传</div>
+    </header>
+
+    <div class="card">
+      <div class="card-title">排序选项</div>
+      <div class="options-group">
+        <div class="option-item">
+          <input type="radio" name="mode" id="mode-alpha" value="alpha" checked>
+          <label for="mode-alpha">字典序</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" name="mode" id="mode-numeric" value="numeric">
+          <label for="mode-numeric">数字排序</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" name="mode" id="mode-length" value="length">
+          <label for="mode-length">长度排序</label>
+        </div>
+      </div>
+      <div class="options-group">
+        <div class="option-item">
+          <input type="radio" name="order" id="order-asc" value="asc" checked>
+          <label for="order-asc">升序 ↑</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" name="order" id="order-desc" value="desc">
+          <label for="order-desc">降序 ↓</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="dual-editor">
+      <div class="card">
+        <div class="card-title">输入文本（每行一项）</div>
+        <div class="editor-container">
+          <textarea id="input" class="editor" placeholder="在此输入或粘贴文本，每行一项..."></textarea>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="sortText()">排序</button>
+          <button class="btn btn-secondary" onclick="clearInput()">清空</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">排序结果</div>
+        <div class="editor-container">
+          <textarea id="output" class="editor" readonly placeholder="排序结果将显示在这里..."></textarea>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-success" onclick="copyResult()">复制结果</button>
+        </div>
+        <div id="stats" class="stats"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="shared/components.js"></script>
+  <script src="shared/utils.js"></script>
+  <script>
+    /**
+     * 字典序排序
+     */
+    function sortAlpha(lines, desc = false) {
+      return [...lines].sort((a, b) => {
+        const cmp = a.localeCompare(b, 'zh-CN');
+        return desc ? -cmp : cmp;
+      });
+    }
+
+    /**
+     * 数字排序
+     */
+    function sortNumeric(lines, desc = false) {
+      return [...lines].sort((a, b) => {
+        const numA = parseFloat(a) || 0;
+        const numB = parseFloat(b) || 0;
+        return desc ? numB - numA : numA - numB;
+      });
+    }
+
+    /**
+     * 长度排序
+     */
+    function sortByLength(lines, desc = false) {
+      return [...lines].sort((a, b) => {
+        return desc ? b.length - a.length : a.length - b.length;
+      });
+    }
+
+    /**
+     * 处理排序
+     */
+    function sortText() {
+      const input = document.getElementById('input').value;
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      const desc = document.querySelector('input[name="order"]:checked').value === 'desc';
+      
+      if (!input.trim()) {
+        showMessage('error', '请输入要排序的文本');
+        return;
+      }
+      
+      const lines = splitLines(input);
+      let sorted;
+      
+      switch (mode) {
+        case 'alpha':
+          sorted = sortAlpha(lines, desc);
+          break;
+        case 'numeric':
+          sorted = sortNumeric(lines, desc);
+          break;
+        case 'length':
+          sorted = sortByLength(lines, desc);
+          break;
+      }
+      
+      document.getElementById('output').value = joinLines(sorted);
+      updateStats({
+        '总行数': lines.length,
+        '排序方式': mode === 'alpha' ? '字典序' : mode === 'numeric' ? '数字' : '长度',
+        '排序方向': desc ? '降序' : '升序'
+      }, document.getElementById('stats'));
+      
+      showMessage('success', '排序完成');
+    }
+
+    function clearInput() {
+      document.getElementById('input').value = '';
+      document.getElementById('output').value = '';
+      document.getElementById('stats').innerHTML = '';
+    }
+
+    function copyResult() {
+      const output = document.getElementById('output').value;
+      if (!output) {
+        showMessage('error', '没有可复制的内容');
+        return;
+      }
+      copyToClipboard(output);
+    }
+  </script>
+</body>
+</html>

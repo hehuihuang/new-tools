@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diff 对比工具 - 代码工具套件</title>
+    <link rel="stylesheet" href="./shared/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/diff-match-patch/index.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+            <h1>Diff 对比工具</h1>
+            <p>比较两段文本或代码的差异，常见于版本审核或重构后检查</p>
+            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
+        </div>
+
+        <div class="card">
+            <div style="margin-bottom: 15px;">
+                <label class="editor-label">对比模式</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="mode" value="char" checked>
+                        逐字符对比
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="mode" value="line">
+                        逐行对比
+                    </label>
+                </div>
+            </div>
+
+            <div class="dual-editor">
+                <div class="editor-container">
+                    <label class="editor-label">原始文本</label>
+                    <textarea id="text1" class="editor" placeholder="在此输入原始文本..."></textarea>
+                </div>
+                <div class="editor-container">
+                    <label class="editor-label">修改后文本</label>
+                    <textarea id="text2" class="editor" placeholder="在此输入修改后的文本..."></textarea>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" id="compare-btn">对比</button>
+                <button class="btn btn-secondary" id="swap-btn">交换</button>
+                <button class="btn btn-danger" id="clear-btn">清空</button>
+            </div>
+        </div>
+
+        <div class="card" id="result-section" style="display: none;">
+            <h3 class="card-title">对比结果</h3>
+            <div id="diff-result"></div>
+        </div>
+    </div>
+
+    <script src="./shared/utils.js"></script>
+    <script src="./shared/components.js"></script>
+    <script>
+        class DiffTool {
+            constructor() {
+                this.text1 = document.getElementById('text1');
+                this.text2 = document.getElementById('text2');
+                this.resultSection = document.getElementById('result-section');
+                this.diffResult = document.getElementById('diff-result');
+                this.diffViewer = new DiffViewer(this.diffResult);
+                
+                this._bindEvents();
+            }
+
+            _bindEvents() {
+                document.getElementById('compare-btn').addEventListener('click', () => this.compare());
+                document.getElementById('swap-btn').addEventListener('click', () => this.swap());
+                document.getElementById('clear-btn').addEventListener('click', () => this.clear());
+            }
+
+            getMode() {
+                return document.querySelector('input[name="mode"]:checked').value;
+            }
+
+            compare() {
+                const t1 = this.text1.value;
+                const t2 = this.text2.value;
+
+                if (!t1 && !t2) {
+                    CodeUtils.showWarning('请输入要对比的文本');
+                    return;
+                }
+
+                const mode = this.getMode();
+                const diffs = CodeUtils.diffText(t1, t2, mode);
+                
+                this.diffViewer.render(diffs);
+                this.resultSection.style.display = 'block';
+                
+                const hasDiff = diffs.some(d => d.type !== 'unchanged');
+                if (hasDiff) {
+                    CodeUtils.showSuccess('对比完成，发现差异');
+                } else {
+                    CodeUtils.showSuccess('对比完成，内容完全一致');
+                }
+            }
+
+            swap() {
+                const temp = this.text1.value;
+                this.text1.value = this.text2.value;
+                this.text2.value = temp;
+            }
+
+            clear() {
+                this.text1.value = '';
+                this.text2.value = '';
+                this.resultSection.style.display = 'none';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new DiffTool();
+        });
+    </script>
+</body>
+</html>

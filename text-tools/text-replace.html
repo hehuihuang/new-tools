@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文本查找替换 - 在线工具箱</title>
+  <link rel="stylesheet" href="shared/styles.css">
+  <style>
+    .search-options {
+      display: flex;
+      gap: 15px;
+      margin-top: 10px;
+    }
+    .highlight {
+      background-color: #ffeb3b;
+      padding: 2px 4px;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+      <h1>文本查找替换工具</h1>
+      <p>支持关键字和正则表达式查找替换，批量修改文本内容</p>
+      <div class="privacy-notice">🔒 所有处理均在本地完成，数据不会上传</div>
+    </header>
+
+    <div class="card">
+      <div class="card-title">查找与替换</div>
+      <div style="display: grid; gap: 10px;">
+        <div>
+          <label style="display: block; margin-bottom: 5px; font-weight: 500;">查找内容</label>
+          <input type="text" id="searchText" class="input" placeholder="输入要查找的文本或正则表达式" style="width: 100%;">
+        </div>
+        <div>
+          <label style="display: block; margin-bottom: 5px; font-weight: 500;">替换为</label>
+          <input type="text" id="replaceText" class="input" placeholder="输入替换后的文本" style="width: 100%;">
+        </div>
+      </div>
+      <div class="search-options">
+        <label style="display: flex; align-items: center; gap: 5px;">
+          <input type="checkbox" id="useRegex">
+          <span>使用正则表达式</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 5px;">
+          <input type="checkbox" id="caseSensitive">
+          <span>区分大小写</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="dual-editor">
+      <div class="card">
+        <div class="card-title">输入文本</div>
+        <div class="editor-container">
+          <textarea id="input" class="editor" placeholder="在此输入或粘贴文本..."></textarea>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="findText()">查找</button>
+          <button class="btn btn-primary" onclick="replaceText()">替换全部</button>
+          <button class="btn btn-secondary" onclick="clearInput()">清空</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">处理结果</div>
+        <div class="editor-container">
+          <textarea id="output" class="editor" readonly placeholder="处理结果将显示在这里..."></textarea>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-success" onclick="copyResult()">复制结果</button>
+        </div>
+        <div id="stats" class="stats"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { showMessage, copyToClipboard, updateStats } from './shared/components.js';
+
+    window.showMessage = showMessage;
+    window.copyToClipboard = copyToClipboard;
+    window.updateStats = updateStats;
+
+    /**
+     * 查找匹配项
+     */
+    function findMatches(text, pattern, options = {}) {
+      const { caseSensitive = false, useRegex = false } = options;
+      
+      try {
+        let regex;
+        if (useRegex) {
+          const flags = caseSensitive ? 'g' : 'gi';
+          regex = new RegExp(pattern, flags);
+        } else {
+          const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const flags = caseSensitive ? 'g' : 'gi';
+          regex = new RegExp(escapedPattern, flags);
+        }
+        
+        const matches = [...text.matchAll(regex)];
+        return {
+          count: matches.length,
+          positions: matches.map(m => m.index)
+        };
+      } catch (error) {
+        throw new Error('无效的正则表达式');
+      }
+    }
+
+    /**
+     * 替换全部
+     */
+    function replaceAll(text, pattern, replacement, options = {}) {
+      const { caseSensitive = false, useRegex = false } = options;
+      
+      try {
+        let regex;
+        if (useRegex) {
+          const flags = caseSensitive ? 'g' : 'gi';
+          regex = new RegExp(pattern, flags);
+        } else {
+          const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const flags = caseSensitive ? 'g' : 'gi';
+          regex = new RegExp(escapedPattern, flags);
+        }
+        
+        return text.replace(regex, replacement);
+      } catch (error) {
+        throw new Error('无效的正则表达式');
+      }
+    }
+
+    /**
+     * 查找文本
+     */
+    window.findText = function() {
+      const input = document.getElementById('input').value;
+      const searchText = document.getElementById('searchText').value;
+      const useRegex = document.getElementById('useRegex').checked;
+      const caseSensitive = document.getElementById('caseSensitive').checked;
+      
+      if (!input.trim()) {
+        showMessage('error', '请输入要查找的文本');
+        return;
+      }
+      
+      if (!searchText) {
+        showMessage('error', '请输入查找内容');
+        return;
+      }
+      
+      try {
+        const result = findMatches(input, searchText, { caseSensitive, useRegex });
+        
+        document.getElementById('output').value = input;
+        updateStats({
+          '找到匹配': `${result.count} 处`,
+          '查找模式': useRegex ? '正则表达式' : '普通文本',
+          '大小写': caseSensitive ? '区分' : '不区分'
+        }, document.getElementById('stats'));
+        
+        if (result.count > 0) {
+          showMessage('success', `找到 ${result.count} 处匹配`);
+        } else {
+          showMessage('info', '未找到匹配项');
+        }
+      } catch (error) {
+        showMessage('error', error.message);
+      }
+    };
+
+    /**
+     * 替换文本
+     */
+    window.replaceText = function() {
+      const input = document.getElementById('input').value;
+      const searchText = document.getElementById('searchText').value;
+      const replaceText = document.getElementById('replaceText').value;
+      const useRegex = document.getElementById('useRegex').checked;
+      const caseSensitive = document.getElementById('caseSensitive').checked;
+      
+      if (!input.trim()) {
+        showMessage('error', '请输入要处理的文本');
+        return;
+      }
+      
+      if (!searchText) {
+        showMessage('error', '请输入查找内容');
+        return;
+      }
+      
+      try {
+        const beforeCount = findMatches(input, searchText, { caseSensitive, useRegex }).count;
+        const result = replaceAll(input, searchText, replaceText, { caseSensitive, useRegex });
+        
+        document.getElementById('output').value = result;
+        updateStats({
+          '替换次数': beforeCount,
+          '查找模式': useRegex ? '正则表达式' : '普通文本',
+          '大小写': caseSensitive ? '区分' : '不区分'
+        }, document.getElementById('stats'));
+        
+        showMessage('success', `已替换 ${beforeCount} 处`);
+      } catch (error) {
+        showMessage('error', error.message);
+      }
+    };
+
+    window.clearInput = function() {
+      document.getElementById('input').value = '';
+      document.getElementById('output').value = '';
+      document.getElementById('searchText').value = '';
+      document.getElementById('replaceText').value = '';
+      document.getElementById('stats').innerHTML = '';
+    };
+
+    window.copyResult = function() {
+      const output = document.getElementById('output').value;
+      if (!output) {
+        showMessage('error', '没有可复制的内容');
+        return;
+      }
+      copyToClipboard(output);
+    };
+
+    // 导出供测试使用
+    window.findMatches = findMatches;
+    window.replaceAll = replaceAll;
+  </script>
+</body>
+</html>

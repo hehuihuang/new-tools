@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文本分割合并 - 在线工具箱</title>
+  <link rel="stylesheet" href="shared/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
+      <h1>文本分割/合并工具</h1>
+      <p>使用自定义分隔符分割或合并文本，灵活转换文本格式</p>
+      <div class="privacy-notice">🔒 所有处理均在本地完成，数据不会上传</div>
+    </header>
+
+    <div class="card">
+      <div class="card-title">操作模式</div>
+      <div class="options-group">
+        <div class="option-item">
+          <input type="radio" name="mode" id="mode-split" value="split" checked>
+          <label for="mode-split">分割文本</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" name="mode" id="mode-join" value="join">
+          <label for="mode-join">合并文本</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">分隔符选择</div>
+      <div class="options-group">
+        <div class="option-item">
+          <input type="radio" name="delimiter" id="delim-comma" value="," checked>
+          <label for="delim-comma">逗号 (,)</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" name="delimiter" id="delim-space" value=" ">
+          <label for="delim-space">空格</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" name="delimiter" id="delim-newline" value="\n">
+          <label for="delim-newline">换行</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" name="delimiter" id="delim-tab" value="\t">
+          <label for="delim-tab">制表符 (Tab)</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" name="delimiter" id="delim-pipe" value="|">
+          <label for="delim-pipe">竖线 (|)</label>
+        </div>
+        <div class="option-item">
+          <input type="radio" name="delimiter" id="delim-custom" value="custom">
+          <label for="delim-custom">自定义</label>
+        </div>
+      </div>
+      <div style="margin-top: 10px;">
+        <input type="text" id="customDelimiter" class="input" placeholder="输入自定义分隔符" style="width: 100%;" disabled>
+      </div>
+    </div>
+
+    <div class="dual-editor">
+      <div class="card">
+        <div class="card-title">输入文本</div>
+        <div class="editor-container">
+          <textarea id="input" class="editor" placeholder="在此输入或粘贴文本..."></textarea>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="processText()">处理</button>
+          <button class="btn btn-secondary" onclick="clearInput()">清空</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">处理结果</div>
+        <div class="editor-container">
+          <textarea id="output" class="editor" readonly placeholder="处理结果将显示在这里..."></textarea>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-success" onclick="copyResult()">复制结果</button>
+        </div>
+        <div id="stats" class="stats"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { showMessage, copyToClipboard, updateStats } from './shared/components.js';
+
+    window.showMessage = showMessage;
+    window.copyToClipboard = copyToClipboard;
+    window.updateStats = updateStats;
+
+    /**
+     * 分割文本
+     */
+    function splitText(text, delimiter) {
+      if (!text) return [];
+      
+      // 处理特殊分隔符
+      let actualDelimiter = delimiter;
+      if (delimiter === '\\n') {
+        actualDelimiter = '\n';
+      } else if (delimiter === '\\t') {
+        actualDelimiter = '\t';
+      }
+      
+      return text.split(actualDelimiter);
+    }
+
+    /**
+     * 合并文本
+     */
+    function joinText(text, delimiter) {
+      // 按行分割输入
+      const lines = text.split(/\r?\n/).filter(line => line.length > 0);
+      
+      // 处理特殊分隔符
+      let actualDelimiter = delimiter;
+      if (delimiter === '\\n') {
+        actualDelimiter = '\n';
+      } else if (delimiter === '\\t') {
+        actualDelimiter = '\t';
+      }
+      
+      return lines.join(actualDelimiter);
+    }
+
+    /**
+     * 获取当前分隔符
+     */
+    function getCurrentDelimiter() {
+      const delimiterRadio = document.querySelector('input[name="delimiter"]:checked');
+      if (delimiterRadio.value === 'custom') {
+        return document.getElementById('customDelimiter').value;
+      }
+      return delimiterRadio.value;
+    }
+
+    /**
+     * 处理文本
+     */
+    window.processText = function() {
+      const input = document.getElementById('input').value;
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      const delimiter = getCurrentDelimiter();
+      
+      if (!input.trim()) {
+        showMessage('error', '请输入要处理的文本');
+        return;
+      }
+      
+      if (!delimiter) {
+        showMessage('error', '请输入自定义分隔符');
+        return;
+      }
+      
+      let result;
+      let stats;
+      
+      if (mode === 'split') {
+        const parts = splitText(input, delimiter);
+        result = parts.join('\n');
+        stats = {
+          '操作': '分割',
+          '分隔符': delimiter === '\n' ? '换行' : delimiter === '\t' ? '制表符' : delimiter,
+          '分割数量': parts.length
+        };
+      } else {
+        result = joinText(input, delimiter);
+        const lines = input.split(/\r?\n/).filter(line => line.length > 0);
+        stats = {
+          '操作': '合并',
+          '分隔符': delimiter === '\n' ? '换行' : delimiter === '\t' ? '制表符' : delimiter,
+          '合并行数': lines.length
+        };
+      }
+      
+      document.getElementById('output').value = result;
+      updateStats(stats, document.getElementById('stats'));
+      showMessage('success', '处理完成');
+    };
+
+    window.clearInput = function() {
+      document.getElementById('input').value = '';
+      document.getElementById('output').value = '';
+      document.getElementById('stats').innerHTML = '';
+    };
+
+    window.copyResult = function() {
+      const output = document.getElementById('output').value;
+      if (!output) {
+        showMessage('error', '没有可复制的内容');
+        return;
+      }
+      copyToClipboard(output);
+    };
+
+    // 监听自定义分隔符选项
+    document.querySelectorAll('input[name="delimiter"]').forEach(radio => {
+      radio.addEventListener('change', function() {
+        const customInput = document.getElementById('customDelimiter');
+        if (this.value === 'custom') {
+          customInput.disabled = false;
+          customInput.focus();
+        } else {
+          customInput.disabled = true;
+        }
+      });
+    });
+
+    // 导出供测试使用
+    window.splitText = splitText;
+    window.joinText = joinText;
+  </script>
+</body>
+</html>

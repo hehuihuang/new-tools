@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>四象限事项管理</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- 引入 FontAwesome 图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #f3f4f6;
+        }
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .checkbox-wrapper input:checked + div {
+            background-color: #10b981;
+            border-color: #10b981;
+        }
+        .checkbox-wrapper input:checked + div svg {
+            display: block;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-gray-800">
+
+    <div class="max-w-3xl mx-auto p-4 md:p-6 lg:p-8">
+        
+        <!-- 头部 -->
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">四象限事项管理</h1>
+            <p class="text-gray-500 text-sm">高效能人士的时间管理法则</p>
+        </header>
+
+        <!-- 输入区域 -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-gray-100">
+            <div class="flex flex-col gap-4">
+                <input type="text" id="taskInput" placeholder="输入待办事项..." 
+                    class="w-full bg-gray-50 border border-gray-200 text-gray-900 text-lg rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent block p-4 transition duration-200 outline-none placeholder-gray-400"
+                    onkeypress="if(event.key === 'Enter') addTask()">
+                
+                <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div class="flex gap-3 w-full sm:w-auto">
+                        <!-- 重要按钮 -->
+                        <button id="btnImportant" onclick="togglePriority('important')" 
+                            class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 border-transparent transition-all duration-200 text-gray-500 bg-gray-100 hover:bg-gray-200 font-medium select-none">
+                            <i class="fa-regular fa-star"></i> 重要
+                        </button>
+                        <!-- 紧急按钮 -->
+                        <button id="btnUrgent" onclick="togglePriority('urgent')" 
+                            class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 border-transparent transition-all duration-200 text-gray-500 bg-gray-100 hover:bg-gray-200 font-medium select-none">
+                            <i class="fa-regular fa-clock"></i> 紧急
+                        </button>
+                    </div>
+                    
+                    <button onclick="addTask()" 
+                        class="w-full sm:w-auto px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md shadow-indigo-200 transition duration-200 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-plus"></i> 添加任务
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 当前选择状态提示 -->
+            <div id="priorityPreview" class="mt-4 text-sm font-medium text-gray-400 flex items-center gap-2 transition-all">
+                <span class="w-2 h-2 rounded-full bg-gray-300"></span> 默认：不重要不紧急
+            </div>
+        </div>
+
+        <!-- 统计概览 -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <div class="bg-white p-3 rounded-xl shadow-sm border-l-4 border-red-500 flex flex-col items-center justify-center">
+                <span class="text-xs text-gray-500 mb-1">重要且紧急</span>
+                <span id="count-q1" class="text-xl font-bold text-red-600">0</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl shadow-sm border-l-4 border-blue-500 flex flex-col items-center justify-center">
+                <span class="text-xs text-gray-500 mb-1">重要不紧急</span>
+                <span id="count-q2" class="text-xl font-bold text-blue-600">0</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl shadow-sm border-l-4 border-orange-400 flex flex-col items-center justify-center">
+                <span class="text-xs text-gray-500 mb-1">紧急不重要</span>
+                <span id="count-q3" class="text-xl font-bold text-orange-500">0</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl shadow-sm border-l-4 border-green-500 flex flex-col items-center justify-center">
+                <span class="text-xs text-gray-500 mb-1">不重要不紧急</span>
+                <span id="count-q4" class="text-xl font-bold text-green-600">0</span>
+            </div>
+        </div>
+
+        <!-- 任务列表容器 -->
+        <div class="space-y-6">
+            <div id="taskList" class="space-y-3 pb-20">
+                <!-- 任务将通过 JS 插入这里 -->
+            </div>
+            
+            <!-- 空状态提示 -->
+            <div id="emptyState" class="hidden text-center py-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4 text-gray-400">
+                    <i class="fa-solid fa-check text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900">暂无任务</h3>
+                <p class="text-gray-500 mt-1">享受这片刻的宁静吧！</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 状态管理
+        let tasks = JSON.parse(localStorage.getItem('eisenhowerTasks')) || [];
+        let isImportant = false;
+        let isUrgent = false;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            renderTasks();
+            updatePriorityUI();
+        });
+
+        // 切换优先级按钮状态
+        function togglePriority(type) {
+            if (type === 'important') isImportant = !isImportant;
+            if (type === 'urgent') isUrgent = !isUrgent;
+            updatePriorityUI();
+        }
+
+        // 更新输入框下方的UI反馈
+        function updatePriorityUI() {
+            const btnImp = document.getElementById('btnImportant');
+            const btnUrg = document.getElementById('btnUrgent');
+            const preview = document.getElementById('priorityPreview');
+
+            // 样式重置
+            const activeClass = "bg-opacity-10 border-opacity-100";
+            
+            // 重要按钮样式
+            if (isImportant) {
+                btnImp.className = "flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all duration-200 font-medium select-none border-red-500 text-red-600 bg-red-50";
+                btnImp.innerHTML = '<i class="fa-solid fa-star"></i> 重要';
+            } else {
+                btnImp.className = "flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 border-transparent transition-all duration-200 text-gray-500 bg-gray-100 hover:bg-gray-200 font-medium select-none";
+                btnImp.innerHTML = '<i class="fa-regular fa-star"></i> 重要';
+            }
+
+            // 紧急按钮样式
+            if (isUrgent) {
+                btnUrg.className = "flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all duration-200 font-medium select-none border-orange-500 text-orange-600 bg-orange-50";
+                btnUrg.innerHTML = '<i class="fa-solid fa-clock"></i> 紧急';
+            } else {
+                btnUrg.className = "flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 border-transparent transition-all duration-200 text-gray-500 bg-gray-100 hover:bg-gray-200 font-medium select-none";
+                btnUrg.innerHTML = '<i class="fa-regular fa-clock"></i> 紧急';
+            }
+
+            // 预览文本更新
+            let text = "";
+            let colorClass = "";
+            
+            if (isImportant && isUrgent) {
+                text = "第一象限：重要且紧急（马上做）";
+                colorClass = "bg-red-500";
+            } else if (isImportant && !isUrgent) {
+                text = "第二象限：重要不紧急（计划做）";
+                colorClass = "bg-blue-500";
+            } else if (!isImportant && isUrgent) {
+                text = "第三象限：紧急不重要（授权做/快速做）";
+                colorClass = "bg-orange-400";
+            } else {
+                text = "第四象限：不重要不紧急（少做/不做）";
+                colorClass = "bg-green-500";
+            }
+
+            preview.innerHTML = `<span class="w-2.5 h-2.5 rounded-full ${colorClass}"></span> ${text}`;
+        }
+
+        // 添加任务
+        function addTask() {
+            const input = document.getElementById('taskInput');
+            const text = input.value.trim();
+            
+            if (!text) return;
+
+            const newTask = {
+                id: Date.now(),
+                text: text,
+                important: isImportant,
+                urgent: isUrgent,
+                completed: false,
+                createdAt: new Date().toISOString()
+            };
+
+            tasks.push(newTask);
+            saveTasks();
+            renderTasks();
+            
+            // 重置输入
+            input.value = '';
+            input.focus();
+            // 保持重要紧急状态不变，方便连续输入，或者取消下面两行注释来重置
+            // isImportant = false;
+            // isUrgent = false;
+            // updatePriorityUI();
+        }
+
+        // 删除任务
+        function deleteTask(id) {
+            tasks = tasks.filter(t => t.id !== id);
+            saveTasks();
+            renderTasks();
+        }
+
+        // 切换完成状态
+        function toggleComplete(id) {
+            const task = tasks.find(t => t.id === id);
+            if (task) {
+                task.completed = !task.completed;
+                saveTasks();
+                renderTasks();
+            }
+        }
+
+        // 保存到本地存储
+        function saveTasks() {
+            localStorage.setItem('eisenhowerTasks', JSON.stringify(tasks));
+        }
+
+        // 获取任务的样式配置
+        function getTaskStyle(task) {
+            if (task.important && task.urgent) {
+                return {
+                    border: 'border-l-4 border-red-500',
+                    bg: 'bg-white',
+                    badge: '<span class="px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-600">重要且紧急</span>',
+                    iconColor: 'text-red-500'
+                };
+            } else if (task.important && !task.urgent) {
+                return {
+                    border: 'border-l-4 border-blue-500',
+                    bg: 'bg-white',
+                    badge: '<span class="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-600">重要不紧急</span>',
+                    iconColor: 'text-blue-500'
+                };
+            } else if (!task.important && task.urgent) {
+                return {
+                    border: 'border-l-4 border-orange-400',
+                    bg: 'bg-white',
+                    badge: '<span class="px-2 py-0.5 rounded text-xs font-bold bg-orange-100 text-orange-600">紧急不重要</span>',
+                    iconColor: 'text-orange-400'
+                };
+            } else {
+                return {
+                    border: 'border-l-4 border-green-500',
+                    bg: 'bg-white', // 稍微变灰一点
+                    badge: '<span class="px-2 py-0.5 rounded text-xs font-bold bg-green-100 text-green-600">闲事</span>',
+                    iconColor: 'text-green-500'
+                };
+            }
+        }
+
+        // 渲染任务列表
+        function renderTasks() {
+            const list = document.getElementById('taskList');
+            const emptyState = document.getElementById('emptyState');
+            
+            // 统计重置
+            const counts = { q1: 0, q2: 0, q3: 0, q4: 0 };
+
+            if (tasks.length === 0) {
+                list.innerHTML = '';
+                list.classList.add('hidden'); // 关键修改：隐藏列表容器，消除 padding
+                emptyState.classList.remove('hidden');
+                updateCounts(counts);
+                return;
+            }
+            
+            list.classList.remove('hidden'); // 有任务时显示列表
+            emptyState.classList.add('hidden');
+
+            // 排序逻辑：
+            // 1. 未完成在前，已完成在后
+            // 2. 优先级顺序：重要紧急(Q1) > 重要不紧急(Q2) > 紧急不重要(Q3) > 不重要不紧急(Q4)
+            // 3. 同级按时间倒序
+            const sortedTasks = [...tasks].sort((a, b) => {
+                if (a.completed !== b.completed) return a.completed ? 1 : -1;
+                
+                const scoreA = (a.important ? 2 : 0) + (a.urgent ? 1 : 0);
+                const scoreB = (b.important ? 2 : 0) + (b.urgent ? 1 : 0);
+                
+                if (scoreA !== scoreB) return scoreB - scoreA;
+                return b.id - a.id;
+            });
+
+            list.innerHTML = sortedTasks.map(task => {
+                // 统计
+                if (!task.completed) {
+                    if (task.important && task.urgent) counts.q1++;
+                    else if (task.important) counts.q2++;
+                    else if (task.urgent) counts.q3++;
+                    else counts.q4++;
+                }
+
+                const style = getTaskStyle(task);
+                const completedClass = task.completed ? "opacity-50 grayscale" : "";
+                const textDecoration = task.completed ? "line-through text-gray-400" : "text-gray-800";
+
+                return `
+                <div class="fade-in relative group ${style.bg} ${style.border} rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-4 flex items-center gap-4 ${completedClass}">
+                    
+                    <!-- 自定义 Checkbox -->
+                    <label class="checkbox-wrapper cursor-pointer relative flex items-center">
+                        <input type="checkbox" class="opacity-0 absolute w-0 h-0" 
+                            ${task.completed ? 'checked' : ''} 
+                            onchange="toggleComplete(${task.id})">
+                        <div class="w-6 h-6 border-2 border-gray-300 rounded-full transition-colors flex items-center justify-center bg-white hover:border-indigo-400">
+                            <svg class="w-3.5 h-3.5 text-white hidden pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                        </div>
+                    </label>
+
+                    <!-- 内容 -->
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            ${style.badge}
+                            <span class="text-xs text-gray-400">${new Date(task.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <p class="text-lg font-medium break-words ${textDecoration}">
+                            ${task.text}
+                        </p>
+                    </div>
+
+                    <!-- 操作按钮 (Hover 显示) -->
+                    <button onclick="deleteTask(${task.id})" class="md:opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                        <i class="fa-regular fa-trash-can"></i>
+                    </button>
+                </div>
+                `;
+            }).join('');
+
+            updateCounts(counts);
+        }
+
+        function updateCounts(counts) {
+            document.getElementById('count-q1').innerText = counts.q1;
+            document.getElementById('count-q2').innerText = counts.q2;
+            document.getElementById('count-q3').innerText = counts.q3;
+            document.getElementById('count-q4').innerText = counts.q4;
+        }
+    </script>
+</body>
+</html>
