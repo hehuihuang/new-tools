@@ -1,0 +1,99 @@
+# --------------- 你指定的忽略项 ---------------
+# 忽略.kiro文件夹（递归忽略该文件夹下所有内容）
+.kiro/
+# 忽略.vscode编辑器配置文件夹
+.vscode/
+
+test
+
+# --------------- 通用编辑器/IDE忽略项 ---------------
+# JetBrains系列（IntelliJ IDEA、WebStorm、PyCharm等）
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+# Vim编辑器临时文件
+*.swp
+*.swo
+*~
+# Emacs编辑器临时文件
+*#
+.\#*
+\#*#
+*.elc
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# --------------- 通用开发忽略项 ---------------
+# 系统临时文件
+.DS_Store       # MacOS
+Thumbs.db       # Windows
+desktop.ini     # Windows
+*.tmp
+*.temp
+# 日志文件
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+# 缓存/锁文件
+*.lock
+*.cache
+# 环境变量文件（敏感信息）
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# 压缩包/安装包
+*.zip
+*.rar
+*.tar.gz
+*.7z
+
+# --------------- 前端项目专属（可选） ---------------
+# 依赖包文件夹
+node_modules/
+# 构建产物
+dist/
+build/
+dist-ssr/
+coverage/
+# 打包临时文件
+.npm/
+.yarn/
+.pnp/
+.pnp.js
+# Vue/React相关临时文件
+*.js.map
+*.css.map
+# 测试报告
+test-results/
+playwright-report/
+
+# --------------- 后端项目专属（可选） ---------------
+# Java/Maven
+target/
+*.jar
+*.war
+*.ear
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+# Go
+vendor/
+*.exe
