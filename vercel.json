@@ -2,6 +2,8 @@
   "version": 2,
   "public": true,
   "rewrites": [
-    { "source": "/", "destination": "/tooles/index.html" }
+    { "source": "/", "destination": "/tooles/index.html" },
+    { "source": "/style.css", "destination": "/tooles/style.css" },
+    { "source": "/script.js", "destination": "/tooles/script.js" }
   ]
 }
