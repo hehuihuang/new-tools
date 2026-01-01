@@ -21,14 +21,14 @@
             <div class="upload-area" id="upload-area">
                 <div class="upload-icon">🖼️</div>
                 <h3>点击或拖拽上传图片</h3>
-                <p style="color: #666; font-size: 14px; margin-top: 10px;">支持 JPG 格式</p>
+                <p style="color: var(--text-light); font-size: 14px; margin-top: 10px;">支持 JPG 格式</p>
             </div>
         </div>
 
         <div class="card" id="process-section" style="display: none;">
             <h3>EXIF 信息</h3>
-            <div id="exif-info" style="background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 15px 0;">
-                <p style="color: #666;">正在读取...</p>
+            <div id="exif-info" style="background: var(--bg-color); padding: 15px; border-radius: 4px; margin: 15px 0; border: 1px solid var(--border-color);">
+                <p style="color: var(--text-light);">正在读取...</p>
             </div>
             
             <div style="margin-top: 20px;">
@@ -38,7 +38,7 @@
 
             <div id="result-section" style="display: none; margin-top: 30px;">
                 <h3>清理结果</h3>
-                <p style="color: #50c878; margin: 15px 0;">✓ EXIF 信息已清理</p>
+                <p style="color: var(--success-color); margin: 15px 0;">✓ EXIF 信息已清理</p>
                 <div style="text-align: center; margin-top: 20px;">
                     <button class="btn btn-secondary" id="download-btn">下载清理后的图片</button>
                 </div>
@@ -112,7 +112,7 @@
                         const allTags = EXIF.getAllTags(img);
                         
                         if (Object.keys(allTags).length === 0) {
-                            this.exifInfo.innerHTML = '<p style="color: #999;">无 EXIF 信息</p>';
+                            this.exifInfo.innerHTML = '<p style="color: var(--text-muted);">无 EXIF 信息</p>';
                         } else {
                             let html = '<table style="width: 100%; font-size: 14px;">';
                             

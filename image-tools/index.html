@@ -6,38 +6,120 @@
     <title>图片工具套件 - 工具列表</title>
     <link rel="stylesheet" href="./shared/styles.css">
     <style>
+        /* 复古风格工具网格 */
         .tools-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
             margin-top: 30px;
         }
+
         .tool-card {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 4px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+            border-bottom: 2px solid var(--border-dark);
             transition: transform 0.3s, box-shadow 0.3s;
             text-decoration: none;
             color: inherit;
             display: block;
         }
+
         .tool-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            box-shadow: var(--shadow-hover);
+            border-color: var(--accent-color);
         }
-        .tool-card h3 {
-            color: #4a90e2;
-            margin-bottom: 10px;
-        }
-        .tool-card p {
-            color: #666;
-            font-size: 14px;
-            line-height: 1.6;
-        }
-        .tool-icon {
+
+        .tool-card .tool-icon {
             font-size: 48px;
             margin-bottom: 15px;
+            display: block;
+        }
+
+        .tool-card h3 {
+            font-family: 'Playfair Display', 'Noto Serif SC', serif;
+            color: var(--primary-color);
+            margin-bottom: 12px;
+            font-size: 1.2rem;
+            letter-spacing: 0.5px;
+        }
+
+        .tool-card p {
+            color: var(--text-light);
+            font-size: 14px;
+            line-height: 1.8;
+        }
+
+        /* 介绍卡片样式 */
+        .intro-card {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 4px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--accent-color);
+        }
+
+        .intro-card h2 {
+            font-family: 'Playfair Display', 'Noto Serif SC', serif;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            font-size: 1.3rem;
+        }
+
+        .intro-card p {
+            color: var(--text-light);
+            line-height: 1.8;
+        }
+
+        /* 使用说明卡片 */
+        .help-card {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 4px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+            margin-top: 40px;
+        }
+
+        .help-card h3 {
+            font-family: 'Playfair Display', 'Noto Serif SC', serif;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .help-card ul {
+            color: var(--text-light);
+            line-height: 2.2;
+            margin-left: 20px;
+        }
+
+        .help-card li {
+            position: relative;
+        }
+
+        .help-card li::marker {
+            color: var(--accent-color);
+        }
+
+        /* 页脚样式 */
+        .footer {
+            background-color: var(--primary-color);
+            color: var(--card-bg);
+            text-align: center;
+            padding: 25px 0;
+            margin-top: 60px;
+            border-top: 3px solid var(--accent-color);
+        }
+
+        .footer p {
+            opacity: 0.9;
+            font-size: 0.9rem;
         }
     </style>
 </head>
@@ -49,9 +131,9 @@
             <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
         </div>
 
-        <div class="card">
-            <h2>选择一个工具开始使用</h2>
-            <p style="color: #666; margin-top: 10px;">
+        <div class="intro-card">
+            <h2>§ 选择一个工具开始使用</h2>
+            <p>
                 这是一套完整的浏览器端图片处理工具集，包含 8 个独立的图片处理功能。
                 所有操作完全在客户端完成，保护您的隐私。
             </p>
@@ -107,9 +189,9 @@
             </a>
         </div>
 
-        <div class="card" style="margin-top: 40px;">
-            <h3>使用说明</h3>
-            <ul style="color: #666; line-height: 2; margin-left: 20px;">
+        <div class="help-card">
+            <h3>📖 使用说明</h3>
+            <ul>
                 <li>所有工具完全在浏览器本地运行，不会上传图片到服务器</li>
                 <li>支持拖拽上传，也可以点击上传区域选择文件</li>
                 <li>默认支持 JPG、PNG、WEBP、BMP 格式</li>
@@ -119,9 +201,9 @@
         </div>
     </div>
 
-    <footer class="footer" style="margin-top: 60px;">
+    <footer class="footer">
         <div class="container">
-            <p>&copy; 2025 图片工具套件. 一站式图片处理解决方案</p>
+            <p>&copy; 2025 图片工具套件 · 一站式图片处理解决方案</p>
         </div>
     </footer>
 </body>

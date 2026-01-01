@@ -1,0 +1,9 @@
+node_modules
+.git
+*.bat
+tests
+vitest.config.js
+package.json
+package-lock.json
+如何使用.txt
+Snipaste_*.jpg

@@ -6,52 +6,329 @@
     <title>Diff 对比工具 - 代码工具套件</title>
     <link rel="stylesheet" href="./shared/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/diff-match-patch/index.js"></script>
+    <style>
+        /* 页面特定样式 - 全屏编辑器布局 */
+        .diff-container {
+            display: flex;
+            flex-direction: column;
+            min-height: calc(100vh - 40px);
+            padding: 20px;
+            max-width: 100%;
+        }
+
+        /* 可折叠头部 */
+        .diff-header {
+            background-color: var(--card-bg);
+            border-radius: 4px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+            border-bottom: 2px solid var(--border-dark);
+            margin-bottom: 20px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .diff-header-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            cursor: pointer;
+            user-select: none;
+            background-color: var(--bg-color);
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.2s;
+        }
+
+        .diff-header-bar:hover {
+            background-color: #e8e0d5;
+        }
+
+        .diff-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .diff-header-bar h1 {
+            font-family: 'Playfair Display', 'Noto Serif SC', serif;
+            font-size: 1.3rem;
+            color: var(--primary-color);
+            margin: 0;
+            letter-spacing: 0.5px;
+        }
+
+        .diff-header-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-light);
+            font-size: 0.85rem;
+        }
+
+        .diff-header-toggle .arrow {
+            transition: transform 0.3s ease;
+            font-size: 0.8rem;
+        }
+
+        .diff-header.collapsed .diff-header-toggle .arrow {
+            transform: rotate(-90deg);
+        }
+
+        .diff-header-content {
+            padding: 15px 20px;
+            max-height: 200px;
+            opacity: 1;
+            transition: all 0.3s ease;
+        }
+
+        .diff-header.collapsed .diff-header-content {
+            max-height: 0;
+            padding: 0 20px;
+            opacity: 0;
+            overflow: hidden;
+        }
+
+        .diff-header p {
+            color: var(--text-light);
+            font-size: 0.95rem;
+            margin-bottom: 10px;
+        }
+
+        .diff-options {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .diff-options .privacy-notice {
+            width: 100%;
+            text-align: center;
+            margin-top: 5px;
+        }
+
+        .diff-mode {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .diff-mode-label {
+            font-weight: 500;
+            color: var(--text-color);
+            font-size: 0.9rem;
+        }
+
+        /* 全屏双栏编辑器 */
+        .diff-editors {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            flex: 1;
+            min-height: 500px;
+        }
+
+        .diff-editor-panel {
+            display: flex;
+            flex-direction: column;
+            background-color: var(--card-bg);
+            border-radius: 4px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .diff-editor-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background-color: var(--bg-color);
+            border-bottom: 2px solid var(--border-dark);
+        }
+
+        .diff-editor-title {
+            font-family: 'Playfair Display', 'Noto Serif SC', serif;
+            font-weight: 600;
+            color: var(--primary-color);
+            font-size: 1rem;
+        }
+
+        .diff-editor-title.original::before {
+            content: '📄 ';
+        }
+
+        .diff-editor-title.modified::before {
+            content: '✏️ ';
+        }
+
+        .diff-editor-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+        }
+
+        .diff-textarea {
+            flex: 1;
+            width: 100%;
+            min-height: 450px;
+            padding: 16px;
+            border: none;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            resize: none;
+            background-color: #3a2920;
+            color: #f4ebe1;
+            outline: none;
+        }
+
+        .diff-textarea::placeholder {
+            color: #8b7355;
+        }
+
+        .diff-textarea:focus {
+            box-shadow: inset 0 0 0 2px var(--accent-color);
+        }
+
+        /* 按钮组 */
+        .diff-actions {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .diff-actions .btn {
+            min-width: 120px;
+            padding: 12px 24px;
+        }
+
+        /* 结果区域 */
+        .diff-result-card {
+            background-color: var(--card-bg);
+            border-radius: 4px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+            margin-top: 20px;
+            overflow: hidden;
+        }
+
+        .diff-result-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 20px;
+            background-color: var(--bg-color);
+            border-bottom: 2px solid var(--border-dark);
+        }
+
+        .diff-result-title {
+            font-family: 'Playfair Display', 'Noto Serif SC', serif;
+            font-weight: 600;
+            color: var(--primary-color);
+            font-size: 1.1rem;
+        }
+
+        .diff-result-body {
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        /* 响应式 */
+        @media (max-width: 900px) {
+            .diff-editors {
+                grid-template-columns: 1fr;
+                min-height: auto;
+            }
+
+            .diff-textarea {
+                min-height: 300px;
+            }
+
+            .diff-actions {
+                flex-direction: column;
+            }
+
+            .diff-actions .btn {
+                width: 100%;
+            }
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <a href="../tooles/index.html" class="back-link">← 返回工具箱</a>
-            <h1>Diff 对比工具</h1>
-            <p>比较两段文本或代码的差异，常见于版本审核或重构后检查</p>
-            <div class="privacy-notice">🔒 所有处理均在本地完成，不上传到服务器</div>
-        </div>
-
-        <div class="card">
-            <div style="margin-bottom: 15px;">
-                <label class="editor-label">对比模式</label>
-                <div class="radio-group">
-                    <label class="radio-label">
-                        <input type="radio" name="mode" value="char" checked>
-                        逐字符对比
-                    </label>
-                    <label class="radio-label">
-                        <input type="radio" name="mode" value="line">
-                        逐行对比
-                    </label>
+    <div class="diff-container">
+        <div class="diff-header" id="diff-header">
+            <div class="diff-header-bar" id="header-toggle">
+                <div class="diff-header-left">
+                    <a href="../tooles/index.html" class="back-link" onclick="event.stopPropagation();">← 返回</a>
+                    <h1>Diff 对比工具</h1>
+                </div>
+                <div class="diff-header-toggle">
+                    <span class="toggle-text">收起设置</span>
+                    <span class="arrow">▼</span>
                 </div>
             </div>
-
-            <div class="dual-editor">
-                <div class="editor-container">
-                    <label class="editor-label">原始文本</label>
-                    <textarea id="text1" class="editor" placeholder="在此输入原始文本..."></textarea>
+            <div class="diff-header-content">
+                <p>比较两段文本或代码的差异，常见于版本审核或重构后检查</p>
+                <div class="diff-options">
+                    <div class="diff-mode">
+                        <span class="diff-mode-label">对比模式：</span>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="mode" value="char" checked>
+                                逐字符对比
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="mode" value="line">
+                                逐行对比
+                            </label>
+                        </div>
+                    </div>
+                    <div class="privacy-notice">🔒 所有处理均在本地完成</div>
                 </div>
-                <div class="editor-container">
-                    <label class="editor-label">修改后文本</label>
-                    <textarea id="text2" class="editor" placeholder="在此输入修改后的文本..."></textarea>
-                </div>
-            </div>
-
-            <div class="btn-group">
-                <button class="btn btn-primary" id="compare-btn">对比</button>
-                <button class="btn btn-secondary" id="swap-btn">交换</button>
-                <button class="btn btn-danger" id="clear-btn">清空</button>
             </div>
         </div>
 
-        <div class="card" id="result-section" style="display: none;">
-            <h3 class="card-title">对比结果</h3>
-            <div id="diff-result"></div>
+        <div class="diff-editors">
+            <div class="diff-editor-panel">
+                <div class="diff-editor-header">
+                    <span class="diff-editor-title original">原始文本</span>
+                </div>
+                <div class="diff-editor-body">
+                    <textarea id="text1" class="diff-textarea" placeholder="在此输入原始文本...&#10;&#10;支持多行文本、代码片段等"></textarea>
+                </div>
+            </div>
+            <div class="diff-editor-panel">
+                <div class="diff-editor-header">
+                    <span class="diff-editor-title modified">修改后文本</span>
+                </div>
+                <div class="diff-editor-body">
+                    <textarea id="text2" class="diff-textarea" placeholder="在此输入修改后的文本...&#10;&#10;支持多行文本、代码片段等"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="diff-actions">
+            <button class="btn btn-primary" id="compare-btn">🔍 开始对比</button>
+            <button class="btn btn-secondary" id="swap-btn">🔄 交换内容</button>
+            <button class="btn btn-danger" id="clear-btn">🗑️ 清空全部</button>
+        </div>
+
+        <div class="diff-result-card" id="result-section" style="display: none;">
+            <div class="diff-result-header">
+                <span class="diff-result-title">📊 对比结果</span>
+            </div>
+            <div class="diff-result-body">
+                <div id="diff-result"></div>
+            </div>
         </div>
     </div>
 
@@ -94,6 +371,9 @@
                 this.diffViewer.render(diffs);
                 this.resultSection.style.display = 'block';
                 
+                // 滚动到结果区域
+                this.resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                
                 const hasDiff = diffs.some(d => d.type !== 'unchanged');
                 if (hasDiff) {
                     CodeUtils.showSuccess('对比完成，发现差异');
@@ -106,17 +386,33 @@
                 const temp = this.text1.value;
                 this.text1.value = this.text2.value;
                 this.text2.value = temp;
+                CodeUtils.showSuccess('内容已交换');
             }
 
             clear() {
                 this.text1.value = '';
                 this.text2.value = '';
                 this.resultSection.style.display = 'none';
+                CodeUtils.showSuccess('已清空');
             }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             new DiffTool();
+            
+            // 头部折叠功能
+            const header = document.getElementById('diff-header');
+            const headerToggle = document.getElementById('header-toggle');
+            const toggleText = headerToggle.querySelector('.toggle-text');
+            
+            headerToggle.addEventListener('click', () => {
+                header.classList.toggle('collapsed');
+                if (header.classList.contains('collapsed')) {
+                    toggleText.textContent = '展开设置';
+                } else {
+                    toggleText.textContent = '收起设置';
+                }
+            });
         });
     </script>
 </body>
